@@ -8,9 +8,9 @@ import Mathlib.Data.Nat.Pairing
 import Mathlib.CategoryTheory.Widesubcategory
 import Mathlib.CategoryTheory.Types.Basic
 import Mathlib.CategoryTheory.ConcreteCategory.Basic
+import Mathlib.CategoryTheory.Limits.Types.Limits
 open CategoryTheory Limits
-open Finset
-open WalkingPair
+
 
 universe u
 variable (C : Type u) [Category C] [HasTerminal C] 
@@ -22,9 +22,9 @@ def HasNNO C [Category C] [HasTerminal C] :=
     (∀ h1 : N ⟶ X, ∀ h2 : N ⟶ X, (zero ≫ h1 = f ∧ s ≫ h1 = h1 ≫ g
     ∧ zero ≫ h2 = f ∧ s ≫ h2 = h2 ≫ g) → h1 = h2)
 
-instance : HasTerminal (Type) := by sorry 
 
- 
+
+example : HasTerminal (Type) := inferInstance
 
 class CategoryTheory.Category_with_NNO (C : Type u) [Category C]
 [HasTerminal C] where 
@@ -32,51 +32,38 @@ N : C
 zero : ⊤_ C ⟶ N 
 s : N ⟶ N 
 recursion {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : N ⟶  X
-fac {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : (zero ≫ recursion f g = f ∧ 
-            s ≫ recursion f g = recursion f g ≫ g)
-uniq {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) (h : N ⟶ X): 
-            (zero ≫ h = f ∧ s ≫ h = h ≫ g) → h = recursion f g 
+fac_zero {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : zero ≫ recursion f g = f
+fac_succ {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : s ≫ recursion f g = recursion f g ≫ g
+uniq {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) (h : N ⟶ X) (hyp_zero : zero ≫ h = f)
+              (hyp_succ : s ≫ h = h ≫ g) : h = recursion f g 
 
-def RecFun {X : Type} (f : (⊤_ Type) → X) (g : X → X) := 
+noncomputable def RecFun {X : Type} (f : (⊤_ Type) → X) (g : X → X) := 
     fun n => match n with 
-    |0 => f (by exact sorry)
+    |0 => f ((terminal.from PUnit).hom PUnit.unit)
     |Nat.succ n => g (RecFun f g n)
-instance : Category_with_NNO (Type) where 
+
+noncomputable instance : Category_with_NNO (Type) where 
 N := Nat
-zero := fun (_ : ⊤_ Type) => (0 : Nat) 
-s := ↑(Nat.succ) 
-recursion f g := RecFun f g 
-fac f g := by sorry 
-uniq f g h := by 
-    intro h1 
-    obtain ⟨h1_zero, h1_succ⟩ := h1
-    dsimp only [CategoryTheory.types_comp] at h1_succ
-    funext n 
-    
+zero := TypeCat.ofHom fun (_ : ⊤_ Type) => Nat.zero 
+s := TypeCat.ofHom Nat.succ 
+recursion f g := TypeCat.ofHom (RecFun f g) 
+fac_zero f g := by sorry 
+fac_succ f g := by sorry
+uniq {X} f g h hyp_zero hyp_succ := by
+  let (φ : Nat → X) := g.hom 
+  have h2 : ∀ (n : Nat), h n = (RecFun f g) n := by 
+    intro n
     induction n with
-
-    | zero =>
-
-    simp only [types_comp] at h1_zero
-
+  
+  | zero =>
     unfold RecFun
-
     simp
-
     rw [← h1_zero]
-
     rfl
-
-    | succ n ih =>
-
-    simp only [types_comp] at h1_succ 
-
+ 
+  | succ n ih =>
+    simp 
     unfold RecFun
-    #check h1_succ
-    simp
-
-
-    rw [← ih]
-
-    sorry
+    rw [ih]
+  --apply DFunLike.ext
 
