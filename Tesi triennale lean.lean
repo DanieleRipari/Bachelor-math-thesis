@@ -1,4 +1,4 @@
-import «Tesi triennale lean».Basic
+--import «Tesi triennale lean».Basic
 import Mathlib.CategoryTheory.Category.Basic
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Prod
@@ -11,6 +11,7 @@ import Mathlib.CategoryTheory.ConcreteCategory.Basic
 import Mathlib.CategoryTheory.Limits.Types.Limits
 open CategoryTheory Limits
 
+set_option autoImplicit false 
 
 universe u
 variable (C : Type u) [Category C] [HasTerminal C] 
@@ -47,23 +48,43 @@ N := Nat
 zero := TypeCat.ofHom fun (_ : ⊤_ Type) => Nat.zero 
 s := TypeCat.ofHom Nat.succ 
 recursion f g := TypeCat.ofHom (RecFun f g) 
-fac_zero f g := by sorry 
-fac_succ f g := by sorry
+fac_zero f g := by 
+  rw[CategoryTheory.ConcreteCategory.hom]
+  simp only [Nat.zero_eq]
+  ext x
+  change (ConcreteCategory.hom (↾RecFun ⇑(instConcreteCategoryTypeFun.1 f) ⇑(instConcreteCategoryTypeFun.1 g))).toFun 0
+   = (ConcreteCategory.hom f).toFun x 
+  have h1 : (↾(fun _ : PUnit => x) : PUnit ⟶ (⊤_ Type)) = terminal.from PUnit :=
+  Subsingleton.elim _ _
+  have : x = (TypeCat.Hom.hom (terminal.from PUnit)) PUnit.unit :=
+  congrFun (congrArg (fun m => ⇑(TypeCat.Hom.hom m)) h1) PUnit.unit
+  rw [this] 
+  rfl
+fac_succ f g := by 
+  rw[CategoryTheory.ConcreteCategory.hom]
+  simp only 
+  ext n
+  rfl 
 uniq {X} f g h hyp_zero hyp_succ := by
-  let (φ : Nat → X) := g.hom 
-  have h2 : ∀ (n : Nat), h n = (RecFun f g) n := by 
-    intro n
-    induction n with
+  rw[CategoryTheory.ConcreteCategory.hom]
+  ext n 
+  simp only [TypeCat.Fun.toFun_apply, TypeCat.hom_ofHom, TypeCat.Fun.coe_mk]
+  induction n with
   
   | zero =>
     unfold RecFun
-    simp
-    rw [← h1_zero]
+    rw [← hyp_zero]
     rfl
  
   | succ n ih =>
-    simp 
-    unfold RecFun
-    rw [ih]
+    have : h.hom (n+1) = (↾Nat.succ ≫ h).hom n := by
+      exact types_congr_hom rfl (n + 1)
+    rw [hyp_succ] at this
+    simp [this, RecFun, ih]
+    rfl
+
+
+    
+  
   --apply DFunLike.ext
 
