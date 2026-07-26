@@ -11,9 +11,13 @@ import Mathlib.CategoryTheory.ConcreteCategory.Basic
 import Mathlib.CategoryTheory.Limits.Types.Limits
 import Mathlib.CategoryTheory.ObjectProperty.LimitsOfShape
 import Mathlib.SetTheory.Cardinal.Arithmetic
-open CategoryTheory Limits WalkingPair
+import Mathlib.CategoryTheory.Monoidal.Closed.Cartesian
+import Mathlib.CategoryTheory.Endofunctor.Algebra
+import Mathlib.CategoryTheory.ObjectProperty.FullSubcategory
+open CategoryTheory Limits WalkingPair ObjectProperty
 
 set_option autoImplicit false
+set_option checkBinderAnnotations false
 
 universe u
  ----------------------------------------------------------------------
@@ -42,7 +46,7 @@ instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete PEmpty) := by
            right_inv := fun ⟨y, hy⟩ => by
              simp only [Finset.mem_singleton] at hy; subst hy; rfl }⟩
 
- --Finset has binary products (to be fixed)
+ --Finset has binary products
 
 instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete Limits.WalkingPair) := by
   constructor
@@ -68,23 +72,23 @@ instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete Limits.Walking
         hlim.isLimit.lift
           (mkCone PUnit (show PUnit ⟶ A from TypeCat.ofHom.{u} fun _ : PUnit.{u+1}=> p.1)
                       (show PUnit ⟶ B from TypeCat.ofHom.{u} fun _ : PUnit.{u+1}=> p.2)) PUnit.unit
-      left_inv := fun x => by 
+      left_inv := fun x => by
         have := hlim.isLimit.uniq
-                  (mkCone PUnit (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => πA x) 
+                  (mkCone PUnit (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => πA x)
                   (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => πB x))
                   (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => x) (by rintro ⟨_|_⟩ <;> rfl)
        -- rw [← TypeCat.hom_ofHom (hlim.isLimit.lift _)] at this
         exact congrArg (fun m => (ConcreteCategory.hom m) PUnit.unit) this.symm
       right_inv := fun p => by
         have hfac := hlim.isLimit.fac
-          (mkCone PUnit (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => p.1) 
+          (mkCone PUnit (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => p.1)
           (TypeCat.ofHom.{u} fun _ : PUnit.{u+1} => p.2))
         have h1 := congrArg (fun m => (ConcreteCategory.hom m) PUnit.unit) (hfac ⟨left⟩)
         have h2 := congrArg (fun m => (ConcreteCategory.hom m) PUnit.unit) (hfac ⟨right⟩)
         exact Prod.ext h1 h2 }
   -- The witness finset is the product finset s ×ˢ t:
   classical
-  obtain ⟨e₀⟩ : Nonempty (α × α ≃ α) := by 
+  obtain ⟨e₀⟩ : Nonempty (α × α ≃ α) := by
     have h : Cardinal.mk (α × α) = Cardinal.mk α := by
       simp [Cardinal.mk_prod, Cardinal.mul_mk_eq_max]
     exact Quotient.exact h
@@ -96,12 +100,14 @@ instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete Limits.Walking
             left_inv := fun _ => rfl
             right_inv := fun _ => rfl }
   · rw [Finset.card_map]
+
+example : HasTerminal (IsFinsetType α).FullSubcategory := inferInstance
+example : HasBinaryProducts (IsFinsetType α).FullSubcategory := inferInstance
+
+
 -------------------------------------------------------------------------
+
 --Definition of NNO and of category with NNO
-
-variable (C : Type u) [Category C] [HasTerminal C]
-
-example : HasTerminal (Type) := inferInstance
 
 structure IsNNO {C : Type u} [Category C]
 [HasTerminal C] (N : C) where
@@ -126,9 +132,12 @@ isNNO : IsNNO N
 
 abbrev NNO (C : Type u) [Category C] [HasTerminal C] [WithNNO C] : IsNNO (WithNNO.N (C := C)) :=
   WithNNO.isNNO (C := C)
+
 --------------------------------------------------------------------------
 
 --Proof that Nat is an NNO in the Type category
+
+example : HasTerminal (Type) := inferInstance
 
 noncomputable def RecFun {X : Type} (f : (⊤_ Type) → X) (g : X → X) :=
     fun n => match n with
@@ -186,7 +195,27 @@ noncomputable instance : WithNNO (Type) :=
 }
 -----------------------------------------------------------------------------
 
+
+
+
+
+
 --some theorems about NNOs
+
+--useful lemma which will be used in several proofs
+
+lemma banal_recursion {C : Type u} [Category C] [HasTerminal C]
+        [WithNNO C] (f : WithNNO.N ⟶ WithNNO.N) (hyp_zero : (NNO C).zero ≫ f = (NNO C).zero)
+        (hyp_succ : (NNO C).s ≫ f = f ≫ (NNO C).s) : f = 𝟙 WithNNO.N := by
+        have eq_1 : f = (NNO C).recursion (NNO C).zero (NNO C).s := by
+          apply (NNO C).uniq
+          · rw[hyp_zero]
+          · rw[hyp_succ]
+        have eq_2 : 𝟙 WithNNO.N = (NNO C).recursion (NNO C).zero (NNO C).s := by
+          apply (NNO C).uniq
+          · rw[Category.comp_id]
+          · rw[Category.comp_id, Category.id_comp]
+        exact eq_1.trans eq_2.symm
 
 --NNO is unique up to isomorphism
 
@@ -197,35 +226,33 @@ def NNO_unique_up_to_iso {C : Type u} [Category C] [HasTerminal C]
   { hom := n1.recursion n2.zero n2.s
     inv := n2.recursion n1.zero n1.s
     hom_inv_id := by
-      have hyp1_zero : n1.zero ≫ (hom ≫ inv) = n1.zero := by
-        rw [← Category.assoc, n1.fac_zero, n2.fac_zero]
-      have hyp1_succ : n1.s ≫ (hom ≫ inv) = (hom ≫ inv) ≫ n1.s := by
-        rw [← Category.assoc, n1.fac_succ, Category.assoc, n2.fac_succ,
+      have eq_1 : hom ≫ inv = n1.recursion n1.zero n1.s := by
+        apply n1.uniq
+        · rw [← Category.assoc, n1.fac_zero, n2.fac_zero]
+        · rw [← Category.assoc, n1.fac_succ, Category.assoc, n2.fac_succ,
             ← Category.assoc]
-      have hyp2_zero : n1.zero ≫ 𝟙 N1 = n1.zero := by
-        rw[Category.comp_id]
-      have hyp2_succ : n1.s ≫ 𝟙 N1 = 𝟙 N1 ≫ n1.s := by
-        rw [Category.comp_id, Category.id_comp]
-      exact (n1.uniq (n1.zero) (n1.s) (hom ≫ inv) hyp1_zero hyp1_succ).trans
-            (n1.uniq (n1.zero) (n1.s) (𝟙 N1) hyp2_zero hyp2_succ).symm
+      have eq_2 : 𝟙 N1 = n1.recursion n1.zero n1.s := by
+        apply n1.uniq
+        · rw[Category.comp_id]
+        · rw [Category.comp_id, Category.id_comp]
+      exact eq_1.trans eq_2.symm
 
     inv_hom_id := by
-       have hyp1_zero : n2.zero ≫ (inv ≫ hom) = n2.zero := by
-        rw [← Category.assoc, n2.fac_zero, n1.fac_zero]
-       have hyp1_succ : n2.s ≫ (inv ≫ hom) = (inv ≫ hom) ≫ n2.s := by
-        rw [← Category.assoc, n2.fac_succ, Category.assoc, n1.fac_succ,
+      have eq_1 : inv ≫ hom = n2.recursion n2.zero n2.s := by
+        apply n2.uniq
+        · rw [← Category.assoc, n2.fac_zero, n1.fac_zero]
+        · rw [← Category.assoc, n2.fac_succ, Category.assoc, n1.fac_succ,
             ← Category.assoc]
-       have hyp2_zero : n2.zero ≫ 𝟙 N2 = n2.zero := by
-        rw[Category.comp_id]
-       have hyp2_succ : n2.s ≫ 𝟙 N2 = 𝟙 N2 ≫ n2.s := by
-        rw [Category.comp_id, Category.id_comp]
-       exact (n2.uniq (n2.zero) (n2.s) (inv ≫ hom) hyp1_zero hyp1_succ).trans
-            (n2.uniq (n2.zero) (n2.s) (𝟙 N2) hyp2_zero hyp2_succ).symm
+      have eq_2 : 𝟙 N2 = n2.recursion n2.zero n2.s := by
+        apply n2.uniq
+        · rw[Category.comp_id]
+        · rw [Category.comp_id, Category.id_comp]
+      exact eq_1.trans eq_2.symm
   }
 
+------------------------------------------------------------------------------------
 
-
---Peano's fourth axiom
+--Consequences of the violation of Peano's fourth axiom
 
 lemma aux1_fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
@@ -240,40 +267,25 @@ lemma aux2_fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
   (h1 : x ≫ (NNO C).s = (NNO C).zero) : (NNO C).s = 𝟙 (WithNNO.N) := by
   obtain ⟨ y, hy ⟩ := (aux1_fourth_axiom h1
-                    (Limits.terminal.from (WithNNO.N) ≫ (NNO C).zero ≫ (NNO C).s))
-  have hyp1_zero : (NNO C).zero ≫ (NNO C).s = (NNO C).zero := by
-    rw[← Category.assoc] at hy
+    (Limits.terminal.from (WithNNO.N) ≫ (NNO C).zero ≫ (NNO C).s))
+  apply banal_recursion
+  · rw[← Category.assoc] at hy
     conv_lhs => rw [← Category.id_comp ((NNO C).zero), Category.assoc,
-     Limits.terminal.hom_ext (𝟙 (⊤_ C)) (y ≫ Limits.terminal.from (WithNNO.N)),
-     hy]
-  have hyp1_succ : (NNO C).s ≫ (NNO C).s = (NNO C).s ≫ (NNO C).s := by rfl
-  have hyp2_zero : (NNO C).zero ≫ 𝟙 (WithNNO.N) = (NNO C).zero := by
-    rw[Category.comp_id]
-  have hyp2_succ : (NNO C).s ≫ 𝟙 (WithNNO.N) = 𝟙 (WithNNO.N) ≫ (NNO C).s := by
-    rw[Category.id_comp, Category.comp_id]
-  exact ((NNO C).uniq (NNO C).zero (NNO C).s (NNO C).s hyp1_zero hyp1_succ).trans
-      ((NNO C).uniq (NNO C).zero (NNO C).s (𝟙 (WithNNO.N)) hyp2_zero hyp2_succ).symm
+      Limits.terminal.hom_ext (𝟙 (⊤_ C)) (y ≫ Limits.terminal.from (WithNNO.N)),
+      hy]
+  · rfl
 
 lemma aux3_fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
   (h1 : x ≫ (NNO C).s = (NNO C).zero) (g : WithNNO.N ⟶ WithNNO.N) :
    g = 𝟙 (WithNNO.N (C := C)) := by
-   letI h := (NNO C).recursion (NNO C).zero g
-   have hyp1_zero : (NNO C).zero ≫ g = (NNO C).zero := by
-    conv_lhs => rw[← (NNO C).fac_zero (NNO C).zero g, Category.assoc,
+   apply banal_recursion
+   · conv_lhs => rw[← (NNO C).fac_zero (NNO C).zero g, Category.assoc,
     ← (NNO C).fac_succ (NNO C).zero g, aux2_fourth_axiom h1, Category.id_comp,
     (NNO C).fac_zero (NNO C).zero g]
-   have hyp1_succ : (NNO C).s ≫ g = g ≫ 𝟙 (WithNNO.N) := by
-    rw[aux2_fourth_axiom h1, Category.id_comp, Category.comp_id]
-   have hyp2_zero : (NNO C).zero ≫ 𝟙 (WithNNO.N) = (NNO C).zero := by
-    rw[Category.comp_id]
-   have hyp2_succ : (NNO C).s ≫ 𝟙 (WithNNO.N) = 𝟙 (WithNNO.N) ≫ 𝟙 (WithNNO.N) := by
-    repeat rw[aux2_fourth_axiom h1]
-   exact ((NNO C).uniq (NNO C).zero (𝟙 (WithNNO.N (C := C))) g hyp1_zero hyp1_succ).trans
-      ((NNO C).uniq (NNO C).zero (𝟙 (WithNNO.N)) (𝟙 (WithNNO.N)) hyp2_zero hyp2_succ).symm
+   · rw[aux2_fourth_axiom h1, Category.id_comp, Category.comp_id]
 
-
-noncomputable def fourth_axiom {C : Type u} [Category C]
+noncomputable def not_fourth_axiom_Nterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
   (h1 : x ≫ (NNO C).s = (NNO C).zero) : Iso (WithNNO.N) (⊤_ C) where
   hom := Limits.terminal.from (WithNNO.N)
@@ -283,6 +295,57 @@ noncomputable def fourth_axiom {C : Type u} [Category C]
   inv_hom_id := by
     rw[Limits.terminal.hom_ext (𝟙 (⊤_ C))]
 
+--Alternative definition of NNO where the fourth axiom holds
+
+structure Is_My_NNO {C : Type u} [Category C]
+      [HasTerminal C] (N : C) extends IsNNO N where
+
+non_term : ¬ Nonempty (IsTerminal N)
+
+class With_My_NNO (C : Type u) [Category C] [HasTerminal C] extends WithNNO C where
+
+non_term : ¬ Nonempty (IsTerminal N)
+
+abbrev My_NNO (C : Type u) [Category C] [HasTerminal C] [With_My_NNO C] :
+    Is_My_NNO (WithNNO.N (C := C)) where
+  toIsNNO := WithNNO.isNNO
+  non_term := With_My_NNO.non_term
+
+theorem fourth_axiom {C : Type u} [Category C]
+  [HasTerminal C] [With_My_NNO C] : ¬ ∃ x : ⊤_ C ⟶ WithNNO.N,
+  x ≫ (My_NNO C).s = (My_NNO C).zero := by
+  by_contra h1
+  rcases h1 with ⟨x, hx⟩
+  have Nterm : IsTerminal (WithNNO.N (C := C)) := by
+    exact (Limits.IsTerminal.ofIso (terminalIsTerminal) (not_fourth_axiom_Nterm hx).symm)
+  exact ((My_NNO C).non_term) (Nonempty.intro Nterm)
+
+----------------------------------------------------------------------------------------------
+
+--Peano's fifth axiom
+
+lemma aux_fifth_axiom {C : Type u} [Category C]
+  [HasTerminal C] [WithNNO C] {M : C} {m : M ⟶ WithNNO.N} [Mono m]
+  {zero' : ⊤_ C ⟶ M} {s' : M ⟶ M} (hyp_zero' : zero' ≫ m = (NNO C).zero)
+  (hyp_s' : s' ≫ m = m ≫ (NNO C).s) : (NNO C).recursion zero' s' ≫ m = 𝟙 WithNNO.N := by
+  apply banal_recursion
+  · rw[← Category.assoc, (NNO C).fac_zero, hyp_zero']
+  · rw[← Category.assoc, (NNO C).fac_succ, Category.assoc, hyp_s', Category.assoc]
+
+noncomputable def fifth_axiom {C : Type u} [Category C]
+  [HasTerminal C] [WithNNO C] {M : C} {m : M ⟶ WithNNO.N} [Mono m]
+  {zero' : ⊤_ C ⟶ M} {s' : M ⟶ M} (hyp_zero' : zero' ≫ m = (NNO C).zero)
+  (hyp_s' : s' ≫ m = m ≫ (NNO C).s) : Iso M WithNNO.N where
+    hom := m
+    inv := (NNO C).recursion zero' s'
+    hom_inv_id := by
+      have : (m ≫ (NNO C).recursion zero' s' ) ≫ m = (𝟙 M) ≫ m := by
+        rw[Category.assoc, aux_fifth_axiom hyp_zero' hyp_s', Category.comp_id, Category.id_comp]
+      rw[cancel_mono m] at this
+      exact this
+    inv_hom_id := aux_fifth_axiom hyp_zero' hyp_s'
+
+
 -------------------------------------------------------------------
 
 --Theorems that only hold in a Cartesian closed category
@@ -290,12 +353,7 @@ noncomputable def fourth_axiom {C : Type u} [Category C]
 --Recursion theorem (case of A = ⊤)
 
 
-structure Rec_Par_with_NNO {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasBinaryProducts C] where
 
-RecPar {A B : C} (f : A ⟶ B)
-    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
-    Limits.prod A WithNNO.N ⟶ B
 
 RecPar_fac_zero {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
@@ -314,20 +372,20 @@ uniq {A B : C} (f : A ⟶ B)
 
 
 
-noncomputable def aux_function1 {C : Type u} [Category C]
+noncomputable def aux_function1_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
-  {B : C} (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) : 
-  Limits.prod WithNNO.N B ⟶ B:= 
+  {B : C} (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
+  Limits.prod WithNNO.N B ⟶ B:=
     (Limits.prod.leftUnitor (Limits.prod WithNNO.N B)).inv ≫
     (Limits.prod.associator (⊤_ C) (WithNNO.N) (B)).inv ≫ g
 
 
-noncomputable def aux_function2 {C : Type u} [Category C]
+noncomputable def aux_function2_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
-  {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) : 
-  WithNNO.N ⟶ Limits.prod WithNNO.N B := 
+  {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
+  WithNNO.N ⟶ Limits.prod WithNNO.N B :=
     (NNO C).recursion (Limits.prod.lift (NNO C).zero f) (Limits.prod.lift
-    ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1 g))
+    ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1_Aterm g))
 
 
 
@@ -335,86 +393,158 @@ noncomputable def Rec_Par_with_NNO_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
   {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
     Limits.prod (⊤_ C) WithNNO.N ⟶ B :=
-    (Limits.prod.leftUnitor WithNNO.N).hom ≫ aux_function2 f g ≫ Limits.prod.snd
+    (Limits.prod.leftUnitor WithNNO.N).hom ≫ aux_function2_Aterm f g ≫ Limits.prod.snd
 
 lemma aux_Rec_Par {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
   {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
-  aux_function2 f g = Limits.prod.lift (𝟙 (WithNNO.N)) (aux_function2 f g ≫ Limits.prod.snd) := by
-    apply Limits.prod.hom_ext 
-    
-    · rw[Limits.prod.lift_fst]  
-      have hyp1_zero : (NNO C).zero ≫ aux_function2 f g ≫ Limits.prod.fst = (NNO C).zero := by 
-        rw[← Category.assoc, aux_function2, (NNO C).fac_zero, Limits.prod.lift_fst] 
-      have hyp1_succ : (NNO C).s ≫ aux_function2 f g ≫ Limits.prod.fst = 
-      (aux_function2 f g ≫ Limits.prod.fst) ≫ (NNO C).s := by 
-        conv_lhs => rw[← Category.assoc, aux_function2, (NNO C).fac_succ, Category.assoc,
-         Limits.prod.lift_fst, ← Category.assoc, ← aux_function2] 
-      have hyp2_zero : (NNO C).zero ≫ 𝟙 (WithNNO.N) = (NNO C).zero := by
-        rw[Category.comp_id]
-      have hyp2_succ : (NNO C).s ≫ 𝟙 (WithNNO.N) = 𝟙 (WithNNO.N) ≫ (NNO C).s := by 
-        rw[Category.comp_id, Category.id_comp]
-      exact ((NNO C).uniq (NNO C).zero (NNO C).s 
-            (aux_function2 f g ≫ Limits.prod.fst) hyp1_zero hyp1_succ).trans 
-            ((NNO C).uniq (NNO C).zero (NNO C).s (𝟙 (WithNNO.N)) hyp2_zero hyp2_succ).symm
-    
+  aux_function2_Aterm f g =
+  Limits.prod.lift (𝟙 (WithNNO.N)) (aux_function2_Aterm f g ≫ Limits.prod.snd) := by
+    apply Limits.prod.hom_ext
+    · rw[Limits.prod.lift_fst]
+      have eq_1 : aux_function2_Aterm f g ≫ Limits.prod.fst =
+          (NNO C).recursion (NNO C).zero (NNO C).s := by
+        apply (NNO C).uniq
+        · rw[← Category.assoc, aux_function2_Aterm, (NNO C).fac_zero, Limits.prod.lift_fst]
+        · conv_lhs => rw[← Category.assoc, aux_function2_Aterm, (NNO C).fac_succ, Category.assoc,
+         Limits.prod.lift_fst, ← Category.assoc, ← aux_function2_Aterm]
+      have eq_2 : 𝟙 WithNNO.N = (NNO C).recursion (NNO C).zero (NNO C).s := by
+        apply (NNO C).uniq
+        · rw[Category.comp_id]
+        · rw[Category.comp_id, Category.id_comp]
+      exact eq_1.trans eq_2.symm
     · rw[Limits.prod.lift_snd]
-    
- 
+
+
 
 theorem Rec_Par_with_NNO_Aterm_fac_zero {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
   {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
-  Limits.prod.map (𝟙 (⊤_ C)) (NNO C).zero ≫ Rec_Par_with_NNO_Aterm f g = 
+  Limits.prod.map (𝟙 (⊤_ C)) (NNO C).zero ≫ Rec_Par_with_NNO_Aterm f g =
   (Limits.prod.leftUnitor (⊤_ C)).hom ≫ f := by
     unfold Rec_Par_with_NNO_Aterm
-    letI ρ := ((NNO C).recursion (prod.lift (NNO C).zero f) 
-    (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1 g)))
-    rw[← Category.assoc, 
+    letI ρ := ((NNO C).recursion (prod.lift (NNO C).zero f)
+    (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1_Aterm g)))
+    rw[← Category.assoc,
     Limits.terminal.hom_ext (Limits.prod.leftUnitor (⊤_ C)).hom Limits.prod.snd,
-    Limits.prod.leftUnitor_hom, Limits.prod.map_snd, Category.assoc, aux_function2,
-    ← Category.assoc ((NNO C).zero) (ρ) (prod.snd), (NNO C).fac_zero, Limits.prod.lift_snd] 
+    Limits.prod.leftUnitor_hom, Limits.prod.map_snd, Category.assoc, aux_function2_Aterm,
+    ← Category.assoc ((NNO C).zero) (ρ) (prod.snd), (NNO C).fac_zero, Limits.prod.lift_snd]
 
-theorem Rec_Par_with_NNO_Aterm_fac_succ {C : Type u} [Category C]
+lemma aux_Rec_Par_Aterm_fac_succ {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
   {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
-  Limits.prod.map (𝟙 (⊤_ C)) (NNO C).s ≫ Rec_Par_with_NNO_Aterm f g = 
-  Limits.prod.lift (𝟙 (Limits.prod (⊤_ C) WithNNO.N)) (Rec_Par_with_NNO_Aterm f g) ≫ g := by
-    unfold Rec_Par_with_NNO_Aterm
-    letI ρ := ((NNO C).recursion (prod.lift (NNO C).zero f) 
-    (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1 g)))
-    rw[← Category.assoc,
-    Limits.prod.leftUnitor_hom, Limits.prod.map_snd, Category.assoc, aux_function2, 
-    ← Category.assoc ((NNO C).s), (NNO C).fac_succ,
-    Category.assoc ρ, Limits.prod.lift_snd, aux_function1]
-    
-    have : prod.snd ≫ ρ ≫ (Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv ≫ 
+  prod.snd ≫ (((NNO C).recursion (prod.lift (NNO C).zero f)
+          (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1_Aterm g)))) ≫
+          (Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv ≫
     (prod.associator (⊤_ C) WithNNO.N B).inv =
-      prod.lift (𝟙 ((⊤_ C) ⨯ WithNNO.N)) (prod.snd ≫ ρ ≫ prod.snd) := by 
-        apply Limits.prod.hom_ext 
-        · rw[Limits.prod.lift_fst, Limits.prod.associator_inv, Category.assoc, Category.assoc, 
-          Category.assoc, Limits.prod.lift_fst] 
+      prod.lift (𝟙 ((⊤_ C) ⨯ WithNNO.N)) (prod.snd ≫ ((NNO C).recursion (prod.lift (NNO C).zero f)
+          (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1_Aterm g))) ≫ prod.snd) := by
+        letI ρ := ((NNO C).recursion (prod.lift (NNO C).zero f)
+          (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1_Aterm g)))
+        apply Limits.prod.hom_ext
+        · rw[Limits.prod.lift_fst, Limits.prod.associator_inv, Category.assoc, Category.assoc,
+          Category.assoc, Limits.prod.lift_fst]
           apply Limits.prod.hom_ext
           · exact Limits.terminal.hom_ext (
-            (prod.snd ≫ ρ ≫ (Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv ≫ 
-                    prod.lift prod.fst (prod.snd ≫ prod.fst)) ≫ prod.fst) 
+            (prod.snd ≫ ρ ≫ (Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv ≫
+                    prod.lift prod.fst (prod.snd ≫ prod.fst)) ≫ prod.fst)
                     (𝟙 ((⊤_ C) ⨯ WithNNO.N) ≫ prod.fst)
           · rw[Category.assoc, Category.assoc, Category.assoc,
              Limits.prod.lift_snd, Category.id_comp,
             ← Category.assoc ((Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv),
             Limits.prod.leftUnitor_inv, Limits.prod.lift_snd, Category.id_comp]
-            dsimp only [ρ]
-            rw[← aux_function2, aux_Rec_Par, Limits.prod.lift_fst, Category.comp_id]
-        · rw[Limits.prod.lift_snd, Limits.prod.associator_inv, Category.assoc, Category.assoc, 
+            rw[← aux_function2_Aterm, aux_Rec_Par, Limits.prod.lift_fst, Category.comp_id]
+        · rw[Limits.prod.lift_snd, Limits.prod.associator_inv, Category.assoc, Category.assoc,
           Category.assoc, Limits.prod.lift_snd, Limits.prod.leftUnitor_inv,
           ← Category.assoc (prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B))),
           Limits.prod.lift_snd, Category.id_comp]
-    
-    rw[← Category.assoc ((Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv), ← Category.assoc ρ,
-    ← Category.assoc prod.snd, this]
-    dsimp only [ρ] 
-    rw[aux_function1]
-    simp only [Category.assoc]  
+
+theorem Rec_Par_with_NNO_Aterm_fac_succ {C : Type u} [Category C]
+  [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
+  {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
+  Limits.prod.map (𝟙 (⊤_ C)) (NNO C).s ≫ Rec_Par_with_NNO_Aterm f g =
+  Limits.prod.lift (𝟙 (Limits.prod (⊤_ C) WithNNO.N)) (Rec_Par_with_NNO_Aterm f g) ≫ g := by
+    unfold Rec_Par_with_NNO_Aterm
+    letI ρ := ((NNO C).recursion (prod.lift (NNO C).zero f)
+    (prod.lift (prod.fst ≫ (NNO C).s) (aux_function1_Aterm g)))
+    rw[← Category.assoc,
+    Limits.prod.leftUnitor_hom, Limits.prod.map_snd, Category.assoc, aux_function2_Aterm,
+    ← Category.assoc ((NNO C).s), (NNO C).fac_succ,
+    Category.assoc ρ, Limits.prod.lift_snd, aux_function1_Aterm,
+    ← Category.assoc ((Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv), ← Category.assoc ρ,
+    ← Category.assoc prod.snd, aux_Rec_Par_Aterm_fac_succ f g, aux_function1_Aterm]
+    simp only [Category.assoc]
+
+lemma aux1_Rec_Par_Aterm_unique {C : Type u} [Category C]
+  [HasTerminal C] [WithNNO C] [HasBinaryProducts C] {B : C}
+  (h : Limits.prod (⊤_ C) WithNNO.N ⟶ B) : prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫
+       prod.lift (𝟙 ((⊤_ C) ⨯ WithNNO.N)) h =
+      prod.lift (𝟙 WithNNO.N) (prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ h) ≫
+      prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B)) ≫
+      prod.lift (prod.lift prod.fst (prod.snd ≫ prod.fst)) (prod.snd ≫ prod.snd) := by
+    apply Limits.prod.hom_ext
+    · rw[Category.assoc, Limits.prod.lift_fst, Category.comp_id,
+        Category.assoc, Category.assoc, Limits.prod.lift_fst, Limits.prod.comp_lift,
+        ← Category.assoc, Limits.prod.lift_snd, Limits.prod.lift_fst, Category.id_comp]
+      apply Limits.prod.hom_ext
+      · exact (Limits.terminal.hom_ext
+              (prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ prod.fst)
+              ((prod.lift (𝟙 WithNNO.N)
+              (prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ h) ≫
+              prod.lift (terminal.from (WithNNO.N ⨯ B)) prod.fst) ≫ prod.fst))
+      · rw[Limits.prod.lift_snd, Category.assoc, Limits.prod.lift_snd, Limits.prod.lift_fst]
+    · rw[Category.assoc, Limits.prod.lift_snd, Category.assoc, Category.assoc,
+        Limits.prod.lift_snd,
+        ← Category.assoc (prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B))),
+        Limits.prod.lift_snd, Category.id_comp, Limits.prod.lift_snd]
+
+lemma aux2_Rec_Par_Aterm_unique {C : Type u} [Category C]
+  [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
+  {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B)
+  (h : Limits.prod (⊤_ C) WithNNO.N ⟶ B)
+  (hyp_zero : Limits.prod.map (𝟙 (⊤_ C)) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
+  (hyp_succ : Limits.prod.map (𝟙 (⊤_ C)) (NNO C).s ≫ h =
+  Limits.prod.lift (𝟙 (Limits.prod (⊤_ C) WithNNO.N)) h ≫ g) :
+  Limits.prod.lift (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h) =
+  aux_function2_Aterm f g := by
+    have eq_1 : Limits.prod.lift (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h) =
+            (NNO C).recursion (Limits.prod.lift (NNO C).zero f) (Limits.prod.lift
+    ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1_Aterm g)) := by
+      apply (NNO C).uniq
+      · rw[Limits.prod.leftUnitor_inv, Limits.prod.comp_lift, Category.comp_id,
+          ← Category.assoc, Limits.prod.comp_lift,
+          Limits.terminal.hom_ext (((NNO C).zero ≫ terminal.from WithNNO.N)) (𝟙 (⊤_ C)),
+          Category.comp_id]
+        have : prod.lift (𝟙 (⊤_ C)) (NNO C).zero =
+            prod.lift (𝟙 (⊤_ C)) (𝟙 (⊤_ C)) ≫ prod.map (𝟙 (⊤_ C)) (NNO C).zero := by
+          conv_lhs => rw[← Category.id_comp (𝟙 (⊤_ C)), ← Category.id_comp (NNO C).zero,
+            ← Limits.prod.lift_map]
+        rw[this, Category.assoc, hyp_zero, ← Category.assoc,
+          Limits.prod.lift_fst, Category.id_comp]
+      · conv_lhs => rw[Limits.prod.leftUnitor_inv, Limits.prod.comp_lift, Category.comp_id,
+          ← Category.assoc, Limits.prod.comp_lift,
+          Limits.terminal.hom_ext (((NNO C).s ≫ terminal.from WithNNO.N)) (terminal.from WithNNO.N),
+          Category.comp_id]
+        have : prod.lift (terminal.from WithNNO.N) (NNO C).s =
+                prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫
+                prod.map (𝟙 (⊤_ C)) (NNO C).s := by
+          conv_lhs => rw[← Category.comp_id (terminal.from WithNNO.N),
+              ← Category.id_comp (NNO C).s, ← Limits.prod.lift_map]
+        conv_lhs => rw[this, Category.assoc, hyp_succ]
+        conv_rhs => rw[Limits.prod.leftUnitor_inv, Limits.prod.comp_lift, ← Category.assoc,
+          Limits.prod.lift_fst, Category.id_comp, aux_function1_Aterm, Limits.prod.leftUnitor_inv,
+          Limits.prod.associator_inv]
+        rw[← Category.assoc, aux1_Rec_Par_Aterm_unique]
+        simp only [Category.assoc]
+    have eq_2 : aux_function2_Aterm f g =
+    (NNO C).recursion (Limits.prod.lift (NNO C).zero f) (Limits.prod.lift
+    ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1_Aterm g)) := by
+      apply (NNO C).uniq
+      · rw[aux_function2_Aterm, (NNO C).fac_zero]
+      · rw[aux_function2_Aterm, (NNO C).fac_succ]
+    exact eq_1.trans eq_2.symm
+
+
 
 theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -422,120 +552,179 @@ theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
   (h : Limits.prod (⊤_ C) WithNNO.N ⟶ B)
   (hyp_zero : Limits.prod.map (𝟙 (⊤_ C)) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
   (hyp_succ : Limits.prod.map (𝟙 (⊤_ C)) (NNO C).s ≫ h =
-  Limits.prod.lift (𝟙 (Limits.prod (⊤_ C) WithNNO.N)) h ≫ g) : 
-  h = Rec_Par_with_NNO_Aterm f g := by 
+  Limits.prod.lift (𝟙 (Limits.prod (⊤_ C) WithNNO.N)) h ≫ g) :
+  h = Rec_Par_with_NNO_Aterm f g := by
     unfold Rec_Par_with_NNO_Aterm
     conv_lhs => rw[← Category.id_comp h, ← (Limits.prod.leftUnitor WithNNO.N).hom_inv_id,
     Limits.prod.leftUnitor_inv, Category.assoc]
-      
-    have : Limits.prod.lift (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h) = 
-      aux_function2 f g := by 
-        
-        have hyp1_zero : ((NNO C).zero ≫ Limits.prod.lift 
-        (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h)) = 
-        Limits.prod.lift (NNO C).zero f := by 
-          rw[Limits.prod.leftUnitor_inv, Limits.prod.comp_lift, Category.comp_id,
-          ← Category.assoc, Limits.prod.comp_lift,
-          Limits.terminal.hom_ext (((NNO C).zero ≫ terminal.from WithNNO.N)) (𝟙 (⊤_ C)),
-          Category.comp_id]
-          have : prod.lift (𝟙 (⊤_ C)) (NNO C).zero = 
-            prod.lift (𝟙 (⊤_ C)) (𝟙 (⊤_ C)) ≫ prod.map (𝟙 (⊤_ C)) (NNO C).zero := by 
-            conv_lhs => rw[← Category.id_comp (𝟙 (⊤_ C)), ← Category.id_comp (NNO C).zero,
-            ← Limits.prod.lift_map]
-          rw[this, Category.assoc, hyp_zero, ← Category.assoc, 
-          Limits.prod.lift_fst, Category.id_comp]
-        
-        have hyp1_succ : ((NNO C).s ≫ Limits.prod.lift 
-        (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h)) = 
-        (Limits.prod.lift (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h)) ≫ 
-         (Limits.prod.lift ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1 g)) := by 
-          conv_lhs => rw[Limits.prod.leftUnitor_inv, Limits.prod.comp_lift, Category.comp_id,
-          ← Category.assoc, Limits.prod.comp_lift,
-          Limits.terminal.hom_ext (((NNO C).s ≫ terminal.from WithNNO.N)) (terminal.from WithNNO.N),
-          Category.comp_id]
-          
-          have : prod.lift (terminal.from WithNNO.N) (NNO C).s = 
-                prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ 
-                prod.map (𝟙 (⊤_ C)) (NNO C).s := by 
-              conv_lhs => rw[← Category.comp_id (terminal.from WithNNO.N), 
-              ← Category.id_comp (NNO C).s, ← Limits.prod.lift_map]
-          conv_lhs => rw[this, Category.assoc, hyp_succ]
-          conv_rhs => rw[Limits.prod.leftUnitor_inv, Limits.prod.comp_lift, ← Category.assoc,
-          Limits.prod.lift_fst, Category.id_comp, aux_function1, Limits.prod.leftUnitor_inv,
-          Limits.prod.associator_inv]
-          
-          have : prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ 
-                  prod.lift (𝟙 ((⊤_ C) ⨯ WithNNO.N)) h =
-                 prod.lift (𝟙 WithNNO.N) (prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ h) ≫
-                  prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B)) ≫
-                  prod.lift (prod.lift prod.fst (prod.snd ≫ prod.fst)) (prod.snd ≫ prod.snd) := by 
-            apply Limits.prod.hom_ext 
-            · rw[Category.assoc, Limits.prod.lift_fst, Category.comp_id,
-              Category.assoc, Category.assoc, Limits.prod.lift_fst, Limits.prod.comp_lift,
-              ← Category.assoc, Limits.prod.lift_snd, Limits.prod.lift_fst, Category.id_comp]
-              apply Limits.prod.hom_ext 
-              · exact (Limits.terminal.hom_ext 
-                    (prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ prod.fst)
-                  ((prod.lift (𝟙 WithNNO.N) 
-                    (prod.lift (terminal.from WithNNO.N) (𝟙 WithNNO.N) ≫ h) ≫
-                    prod.lift (terminal.from (WithNNO.N ⨯ B)) prod.fst) ≫ prod.fst)) 
-              · rw[Limits.prod.lift_snd, Category.assoc, Limits.prod.lift_snd, Limits.prod.lift_fst]
-            · rw[Category.assoc, Limits.prod.lift_snd, Category.assoc, Category.assoc,
-              Limits.prod.lift_snd, 
-              ← Category.assoc (prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B))),
-              Limits.prod.lift_snd, Category.id_comp, Limits.prod.lift_snd]
-        
-          rw[← Category.assoc, this]
-          simp only [Category.assoc]
-        
-        have hyp2_zero : (NNO C).zero ≫ aux_function2 f g = Limits.prod.lift (NNO C).zero f := by 
-          rw[aux_function2, (NNO C).fac_zero]
-        
-        have hyp2_succ : (NNO C).s ≫ aux_function2 f g = aux_function2 f g ≫
-                (Limits.prod.lift ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1 g)) := by 
-                rw[aux_function2, (NNO C).fac_succ]
-        
-        exact (((NNO C).uniq 
-        (Limits.prod.lift (NNO C).zero f) (Limits.prod.lift
-    ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1 g)) 
-    (Limits.prod.lift (𝟙 WithNNO.N) ((Limits.prod.leftUnitor WithNNO.N).inv ≫ h)) 
-        hyp1_zero hyp1_succ).trans 
-    ((NNO C).uniq (Limits.prod.lift (NNO C).zero f) (Limits.prod.lift
-    ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1 g)) (aux_function2 f g) 
-    hyp2_zero hyp2_succ).symm)  
-    rw[← this, Limits.prod.lift_snd, ← Limits.prod.leftUnitor_inv]             
+    rw[← aux2_Rec_Par_Aterm_unique f g h hyp_zero hyp_succ,
+    Limits.prod.lift_snd, ← Limits.prod.leftUnitor_inv]
 
 --------------------------------------------------------------------------------------------
 
 -- Recursion theorem (general case)
 
-
+--noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
+      [WithNNO C] [HasBinaryProducts C] [MonoidalCategory C] [CartesianClosed C]
+      {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :=
+      CartesianClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f)
 
 --Peano's third axiom
 
 noncomputable def prec {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasBinaryProducts C] : WithNNO.N (C := C) ⟶ WithNNO.N := 
-      (Limits.prod.leftUnitor WithNNO.N).inv ≫ 
-      Rec_Par_with_NNO_Aterm (NNO C).zero (prod.fst ≫ prod.snd) 
+      [WithNNO C] [HasBinaryProducts C] : WithNNO.N (C := C) ⟶ WithNNO.N :=
+      (Limits.prod.leftUnitor WithNNO.N).inv ≫
+      Rec_Par_with_NNO_Aterm (NNO C).zero (prod.fst ≫ prod.snd)
 
 lemma succ_prec_id {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasBinaryProducts C] : (NNO C).s ≫ prec = 𝟙 WithNNO.N := by 
+      [WithNNO C] [HasBinaryProducts C] : (NNO C).s ≫ prec = 𝟙 WithNNO.N := by
       rw[prec, Limits.prod.leftUnitor_inv, ← Category.assoc, Limits.prod.comp_lift,
       Limits.terminal.hom_ext ((NNO C).s ≫ terminal.from WithNNO.N) (terminal.from WithNNO.N),
       Category.comp_id, ← Category.comp_id (terminal.from WithNNO.N),
       ← Category.id_comp (NNO C).s, ← Limits.prod.lift_map, Category.assoc,
-      Rec_Par_with_NNO_Aterm_fac_succ, ← Category.assoc (prod.lift 
+      Rec_Par_with_NNO_Aterm_fac_succ, ← Category.assoc (prod.lift
       (𝟙 ((⊤_ C) ⨯ WithNNO.N)) (Rec_Par_with_NNO_Aterm (NNO C).zero (prod.fst ≫ prod.snd))),
       Limits.prod.lift_fst, Category.id_comp, Limits.prod.lift_snd]
 
 instance {C : Type u} [Category C]
     [HasTerminal C] [WithNNO C] [HasBinaryProducts C] :
-    Mono (NNO C).s :=  
+    Mono (NNO C).s :=
     {
-      right_cancellation g h := by 
-        intro hyp1 
-        have hyp2 : (g ≫ (NNO C).s) ≫ prec = (h ≫ (NNO C).s) ≫ prec := congr_arg (· ≫ prec) hyp1 
+      right_cancellation g h := by
+        intro hyp1
+        have hyp2 : (g ≫ (NNO C).s) ≫ prec = (h ≫ (NNO C).s) ≫ prec := congr_arg (· ≫ prec) hyp1
         rw[Category.assoc, Category.assoc, succ_prec_id, Category.comp_id, Category.comp_id] at hyp2
-        exact hyp2 
+        exact hyp2
     }
+
+------------------------------------------------------------------------------------------------
+
+--Proof that Finset does not have an NNO
+
+theorem isFinsetType_fin_two : IsFinsetType α (ULift (Fin 2)) := by
+  classical
+  obtain ⟨a, b, hab⟩ := exists_pair_ne α
+  refine ⟨{a, b}, ⟨?_⟩⟩
+  apply Fintype.equivOfCardEq
+  rw [Fintype.card_ulift, Fintype.card_fin, Fintype.card_coe, Finset.card_pair hab]
+
+def finTwoObj : (IsFinsetType α).FullSubcategory :=
+  ⟨ULift (Fin 2), isFinsetType_fin_two α⟩
+
+
+lemma Finset_NNO_s_not_surj (NatObj : WithNNO (IsFinsetType α).FullSubcategory) :
+    ¬ Function.Surjective (NatObj.isNNO.s) := by
+    unfold Function.Surjective
+    by_contra h1
+    have hterm : Nonempty (⊤_ (IsFinsetType α).FullSubcategory).obj := by
+      have hPUnit : IsFinsetType α PUnit :=
+        ⟨{default}, ⟨{ toFun := fun _ => ⟨default, Finset.mem_singleton_self _⟩
+                       invFun := fun _ => PUnit.unit
+                       left_inv := fun _ => by rfl
+                       right_inv := fun q => by
+                         obtain ⟨y, hy⟩ := q
+                         simp only [Finset.mem_singleton] at hy
+                         subst hy; rfl }⟩⟩
+      let PUnitObj : (IsFinsetType α).FullSubcategory := ⟨PUnit, hPUnit⟩
+      let φ : PUnitObj ⟶ ⊤_ (IsFinsetType α).FullSubcategory :=
+        Limits.terminalIsTerminal.from PUnitObj
+      exact ⟨(ConcreteCategory.hom φ) PUnit.unit⟩
+    obtain ⟨pt⟩ := hterm
+    set m := (ConcreteCategory.hom NatObj.isNNO.zero) pt with hm
+    obtain ⟨k, hk⟩ := h1 m
+    let f : ⊤_ (IsFinsetType α).FullSubcategory ⟶ finTwoObj α :=
+        ⟨TypeCat.ofHom (fun _ => ULift.up (0 : Fin 2))⟩
+    let g : finTwoObj α ⟶ finTwoObj α :=
+        ⟨TypeCat.ofHom (fun _ => ULift.up (1 : Fin 2))⟩
+    let h : NatObj.N ⟶ finTwoObj α := NatObj.isNNO.recursion f g
+    have hf : f pt = ULift.up (0 : Fin 2) := by rfl
+    have hg : g (h k) = ULift.up (1 : Fin 2) := by rfl
+    have : f pt = g (h k) := by
+      simp only [h]
+      rw[← NatObj.isNNO.fac_zero f, ConcreteCategory.comp_apply, ← hm,
+      ← hk, ← ConcreteCategory.comp_apply, NatObj.isNNO.fac_succ f g,
+      ConcreteCategory.comp_apply, NatObj.isNNO.fac_zero]
+    exact absurd (ULift.up.inj ((hf.symm.trans this).trans hg)) (by decide)
+
+#check Finset_NNO_s_not_surj
+
+lemma Finset_without_NNO : ¬ Nonempty (WithNNO (IsFinsetType α).FullSubcategory) := by
+  by_contra h1
+  have NatObj : WithNNO (IsFinsetType α).FullSubcategory := Classical.choice h1
+  have s_inj : Function.Injective (NatObj.isNNO.s) := by
+    apply (CategoryTheory.mono_iff_injective ((IsFinsetType α).ι.map NatObj.isNNO.s)).mp
+    have : Functor.PreservesMonomorphisms ((IsFinsetType α).ι) := by sorry
+    apply (CategoryTheory.Functor.mono_map_iff_mono (IsFinsetType α).ι NatObj.isNNO.s).mpr
+    exact inferInstance
+  have : Finite ((IsFinsetType α).ι.obj WithNNO.N) := by sorry
+  exact (Finset_NNO_s_not_surj α NatObj) ((Function.Injective.surjective_of_finite
+          (Equiv.refl ((IsFinsetType α).ι.obj NatObj.N))) s_inj)
+
+--NNO as initial algebra
+
+noncomputable def T {C : Type u} [Category C] [HasTerminal C]
+      [HasBinaryCoproducts C] : Functor C C where
+
+obj X := Limits.coprod (⊤_ C) X
+map f := Limits.coprod.map (𝟙 (⊤_ C)) f
+
+noncomputable def Nalg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] : Endofunctor.Algebra (T : Functor C C) where
+
+a := WithNNO.N
+str := Limits.coprod.desc (NNO C).zero (NNO C).s
+
+noncomputable def aux1_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C)) : WithNNO.N ⟶ A.a :=
+      (NNO C).recursion (Limits.coprod.inl ≫ A.str) (Limits.coprod.inr ≫ A.str)
+
+lemma aux_lemma_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C)) :
+      coprod.desc (coprod.inl ≫ A.str) (coprod.inr ≫ A.str) = A.str := by
+      apply Limits.coprod.hom_ext
+      · rw[Limits.coprod.inl_desc]
+      · rw[Limits.coprod.inr_desc]
+
+noncomputable def init_mor {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C)) :
+      Endofunctor.Algebra.Hom Nalg A where
+
+f := aux1_init_alg A
+h := by
+    dsimp [T, Nalg, aux1_init_alg]
+    rw[Limits.coprod.desc_comp, (NNO C).fac_zero, (NNO C).fac_succ]
+    conv_rhs => rw[← Category.id_comp (Limits.coprod.inl ≫ A.str), ← Limits.coprod.map_desc,
+    Category.id_comp, aux_lemma_init_alg]
+
+lemma init_mor_uniq {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C))
+      (g : Endofunctor.Algebra.Hom Nalg A) : g = init_mor A := by
+      have : T.map g.f ≫ A.str = Nalg.str ≫ g.f := g.h
+      dsimp [T, Nalg, aux1_init_alg] at this
+      rw[Limits.coprod.desc_comp, ← aux_lemma_init_alg,
+      Limits.coprod.map_desc, Category.id_comp] at this
+      apply Endofunctor.Algebra.Hom.ext
+      dsimp [init_mor, aux1_init_alg]
+      apply (NNO C).uniq
+      · have helper : coprod.inl ≫ coprod.desc (coprod.inl ≫ A.str) (g.f ≫ coprod.inr ≫ A.str)
+         = coprod.inl ≫ coprod.desc ((NNO C).zero ≫ g.f) ((NNO C).s ≫ g.f) := by
+          exact (Limits.coprod.hom_ext_iff.mp this).left
+        rw[Limits.coprod.inl_desc, Limits.coprod.inl_desc] at helper
+        exact helper.symm
+      · have helper : coprod.inr ≫ coprod.desc (coprod.inl ≫ A.str) (g.f ≫ coprod.inr ≫ A.str)
+         = coprod.inr ≫ coprod.desc ((NNO C).zero ≫ g.f) ((NNO C).s ≫ g.f) := by
+          exact (Limits.coprod.hom_ext_iff.mp this).right
+        rw[Limits.coprod.inr_desc, Limits.coprod.inr_desc] at helper
+        exact helper.symm
+
+noncomputable def NNO_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] : IsInitial (Nalg : Endofunctor.Algebra (T : Functor C C)) := by
+      unfold IsInitial
+      exact {
+        desc s := init_mor s.pt
+        fac s j := j.as.elim
+        uniq s m := by
+          intros
+          exact init_mor_uniq s.pt m
+        }
 
