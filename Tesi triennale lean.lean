@@ -22,13 +22,17 @@ set_option checkBinderAnnotations false
 universe u
  ----------------------------------------------------------------------
 
---Proof that Finset is Cartesian closed
+--Section 1: Proof that Finset is Cartesian closed
 
 variable (α : Type u) [Inhabited α] [Infinite α]
+
+-- Definition of the Finset category (described as the subcategory of the Type u category
+-- which contains all the objects isomorphic to an object in Finset α)
+
 def IsFinsetType (α : Type u) : ObjectProperty (Type u) :=
   fun X => ∃ s : Finset α, Nonempty (X ≃ (s : Type u))
 
---Finset has a terminal object
+--Proof that Finset has a terminal object
 
 instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete PEmpty) := by
   constructor
@@ -46,7 +50,7 @@ instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete PEmpty) := by
            right_inv := fun ⟨y, hy⟩ => by
              simp only [Finset.mem_singleton] at hy; subst hy; rfl }⟩
 
- --Finset has binary products
+ --Proof that Finset has binary products
 
 instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete Limits.WalkingPair) := by
   constructor
@@ -101,13 +105,15 @@ instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete Limits.Walking
             right_inv := fun _ => rfl }
   · rw [Finset.card_map]
 
+--Inferring the instances
+
 example : HasTerminal (IsFinsetType α).FullSubcategory := inferInstance
 example : HasBinaryProducts (IsFinsetType α).FullSubcategory := inferInstance
 
 
 -------------------------------------------------------------------------
 
---Definition of NNO and of category with NNO
+--Section 2: Definition of NNO and of category with NNO
 
 structure IsNNO {C : Type u} [Category C]
 [HasTerminal C] (N : C) where
@@ -135,14 +141,18 @@ abbrev NNO (C : Type u) [Category C] [HasTerminal C] [WithNNO C] : IsNNO (WithNN
 
 --------------------------------------------------------------------------
 
---Proof that Nat is an NNO in the Type category
+--Section 3: Proof that Nat is an NNO in the Type category
 
 example : HasTerminal (Type) := inferInstance
+
+--Definition of the recursion function
 
 noncomputable def RecFun {X : Type} (f : (⊤_ Type) → X) (g : X → X) :=
     fun n => match n with
     |0 => f ((terminal.from PUnit).hom PUnit.unit)
     |Nat.succ n => g (RecFun f g n)
+
+--Key result
 
 noncomputable def Nat_NNO_Type : IsNNO (Nat) where
 
@@ -195,14 +205,9 @@ noncomputable instance : WithNNO (Type) :=
 }
 -----------------------------------------------------------------------------
 
+--Section 4: Some theorems about NNOs
 
-
-
-
-
---some theorems about NNOs
-
---useful lemma which will be used in several proofs
+--Useful lemma which will be used in several proofs
 
 lemma banal_recursion {C : Type u} [Category C] [HasTerminal C]
         [WithNNO C] (f : WithNNO.N ⟶ WithNNO.N) (hyp_zero : (NNO C).zero ≫ f = (NNO C).zero)
@@ -217,7 +222,7 @@ lemma banal_recursion {C : Type u} [Category C] [HasTerminal C]
           · rw[Category.comp_id, Category.id_comp]
         exact eq_1.trans eq_2.symm
 
---NNO is unique up to isomorphism
+--Proof that the NNO is unique up to isomorphism
 
 def NNO_unique_up_to_iso {C : Type u} [Category C] [HasTerminal C]
     {N1 N2 : C} (n1 : IsNNO N1) (n2 : IsNNO N2) : Iso N1 N2 :=
@@ -252,7 +257,9 @@ def NNO_unique_up_to_iso {C : Type u} [Category C] [HasTerminal C]
 
 ------------------------------------------------------------------------------------
 
---Consequences of the violation of Peano's fourth axiom
+--Section 5: Peano's fourth axiom
+
+--Proof that, if Peano's fourth axiom fails, zero factors into any morphism g : N ⟶ N
 
 lemma aux1_fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
@@ -262,6 +269,8 @@ lemma aux1_fourth_axiom {C : Type u} [Category C]
     use x ≫ h
     rw[Category.assoc, ← (NNO C).fac_succ,
     ← Category.assoc, h1, (NNO C).fac_zero]
+
+--Proof that, with the same hypothesis, s is the identity
 
 lemma aux2_fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
@@ -275,6 +284,8 @@ lemma aux2_fourth_axiom {C : Type u} [Category C]
       hy]
   · rfl
 
+--Proof that, with the same hypothesis, the only morphism N ⟶ N is the identity
+
 lemma aux3_fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
   (h1 : x ≫ (NNO C).s = (NNO C).zero) (g : WithNNO.N ⟶ WithNNO.N) :
@@ -284,6 +295,8 @@ lemma aux3_fourth_axiom {C : Type u} [Category C]
     ← (NNO C).fac_succ (NNO C).zero g, aux2_fourth_axiom h1, Category.id_comp,
     (NNO C).fac_zero (NNO C).zero g]
    · rw[aux2_fourth_axiom h1, Category.id_comp, Category.comp_id]
+
+--Proof that, if Peano's fourth axiom fails, N is terminal
 
 noncomputable def not_fourth_axiom_Nterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {x : ⊤_ C ⟶ WithNNO.N}
@@ -311,6 +324,8 @@ abbrev My_NNO (C : Type u) [Category C] [HasTerminal C] [With_My_NNO C] :
   toIsNNO := WithNNO.isNNO
   non_term := With_My_NNO.non_term
 
+--Proof that, with the new definition, Peano's fourth axiom holds
+
 theorem fourth_axiom {C : Type u} [Category C]
   [HasTerminal C] [With_My_NNO C] : ¬ ∃ x : ⊤_ C ⟶ WithNNO.N,
   x ≫ (My_NNO C).s = (My_NNO C).zero := by
@@ -322,7 +337,9 @@ theorem fourth_axiom {C : Type u} [Category C]
 
 ----------------------------------------------------------------------------------------------
 
---Peano's fifth axiom
+--Section 6: Peano's fifth axiom
+
+--Auxiliary result
 
 lemma aux_fifth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {M : C} {m : M ⟶ WithNNO.N} [Mono m]
@@ -331,6 +348,8 @@ lemma aux_fifth_axiom {C : Type u} [Category C]
   apply banal_recursion
   · rw[← Category.assoc, (NNO C).fac_zero, hyp_zero']
   · rw[← Category.assoc, (NNO C).fac_succ, Category.assoc, hyp_s', Category.assoc]
+
+--Proof of Peano's fifth axiom
 
 noncomputable def fifth_axiom {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] {M : C} {m : M ⟶ WithNNO.N} [Mono m]
@@ -350,7 +369,7 @@ noncomputable def fifth_axiom {C : Type u} [Category C]
 
 --Theorems that only hold in a Cartesian closed category
 
---Recursion theorem (case of A = ⊤)
+--Section 8a: Recursion theorem (case of A = ⊤)
 
 
 
@@ -371,6 +390,8 @@ uniq {A B : C} (f : A ⟶ B)
     Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = RecPar f g
 
 
+--Definition that extracts a morphism N x B ⟶ B
+-- from a morphism ⊤ x N x B ⟶ B in the canonical way
 
 noncomputable def aux_function1_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -379,6 +400,7 @@ noncomputable def aux_function1_Aterm {C : Type u} [Category C]
     (Limits.prod.leftUnitor (Limits.prod WithNNO.N B)).inv ≫
     (Limits.prod.associator (⊤_ C) (WithNNO.N) (B)).inv ≫ g
 
+--Intermediate definition of ρ useful for the theorem
 
 noncomputable def aux_function2_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -387,13 +409,15 @@ noncomputable def aux_function2_Aterm {C : Type u} [Category C]
     (NNO C).recursion (Limits.prod.lift (NNO C).zero f) (Limits.prod.lift
     ((Limits.prod.fst) ≫ (NNO C).s) (aux_function1_Aterm g))
 
-
+--Definition of the seeked morphism in the recursion theorem
 
 noncomputable def Rec_Par_with_NNO_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
   {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
     Limits.prod (⊤_ C) WithNNO.N ⟶ B :=
     (Limits.prod.leftUnitor WithNNO.N).hom ≫ aux_function2_Aterm f g ≫ Limits.prod.snd
+
+--Proof of an intermediate result for the commutativity of the left part of the diagram
 
 lemma aux_Rec_Par {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -415,7 +439,7 @@ lemma aux_Rec_Par {C : Type u} [Category C]
       exact eq_1.trans eq_2.symm
     · rw[Limits.prod.lift_snd]
 
-
+--Proof that the left part of the diagram commutes
 
 theorem Rec_Par_with_NNO_Aterm_fac_zero {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -429,6 +453,8 @@ theorem Rec_Par_with_NNO_Aterm_fac_zero {C : Type u} [Category C]
     Limits.terminal.hom_ext (Limits.prod.leftUnitor (⊤_ C)).hom Limits.prod.snd,
     Limits.prod.leftUnitor_hom, Limits.prod.map_snd, Category.assoc, aux_function2_Aterm,
     ← Category.assoc ((NNO C).zero) (ρ) (prod.snd), (NNO C).fac_zero, Limits.prod.lift_snd]
+
+--Technical result used in the next proof
 
 lemma aux_Rec_Par_Aterm_fac_succ {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -459,6 +485,8 @@ lemma aux_Rec_Par_Aterm_fac_succ {C : Type u} [Category C]
           ← Category.assoc (prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B))),
           Limits.prod.lift_snd, Category.id_comp]
 
+--Proof that the right part of the diagram commutes
+
 theorem Rec_Par_with_NNO_Aterm_fac_succ {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
   {B : C} (f : ⊤_ C ⟶ B) (g : Limits.prod (Limits.prod (⊤_ C) WithNNO.N) B ⟶ B) :
@@ -474,6 +502,8 @@ theorem Rec_Par_with_NNO_Aterm_fac_succ {C : Type u} [Category C]
     ← Category.assoc ((Limits.prod.leftUnitor (WithNNO.N ⨯ B)).inv), ← Category.assoc ρ,
     ← Category.assoc prod.snd, aux_Rec_Par_Aterm_fac_succ f g, aux_function1_Aterm]
     simp only [Category.assoc]
+
+--Technical result used in the uniqueness proof
 
 lemma aux1_Rec_Par_Aterm_unique {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C] {B : C}
@@ -497,6 +527,8 @@ lemma aux1_Rec_Par_Aterm_unique {C : Type u} [Category C]
         Limits.prod.lift_snd,
         ← Category.assoc (prod.lift (terminal.from (WithNNO.N ⨯ B)) (𝟙 (WithNNO.N ⨯ B))),
         Limits.prod.lift_snd, Category.id_comp, Limits.prod.lift_snd]
+
+--Technical result used in the uniqueness proof
 
 lemma aux2_Rec_Par_Aterm_unique {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -544,7 +576,7 @@ lemma aux2_Rec_Par_Aterm_unique {C : Type u} [Category C]
       · rw[aux_function2_Aterm, (NNO C).fac_succ]
     exact eq_1.trans eq_2.symm
 
-
+--Proof of the uniqueness of the seeked morphism
 
 theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -562,19 +594,25 @@ theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
 
 --------------------------------------------------------------------------------------------
 
--- Recursion theorem (general case)
+-- Section 8b: Recursion theorem (general case)
 
 --noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
       [WithNNO C] [HasBinaryProducts C] [MonoidalCategory C] [CartesianClosed C]
       {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :=
       CartesianClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f)
 
---Peano's third axiom
 
+--------------------------------------------------------------------------------------------
+
+--Section 9: Peano's third axiom
+
+--Definition of the left inverse of s (namely, the function precedent)
 noncomputable def prec {C : Type u} [Category C] [HasTerminal C]
       [WithNNO C] [HasBinaryProducts C] : WithNNO.N (C := C) ⟶ WithNNO.N :=
       (Limits.prod.leftUnitor WithNNO.N).inv ≫
       Rec_Par_with_NNO_Aterm (NNO C).zero (prod.fst ≫ prod.snd)
+
+--Proof that prec is a left inverse for s
 
 lemma succ_prec_id {C : Type u} [Category C] [HasTerminal C]
       [WithNNO C] [HasBinaryProducts C] : (NNO C).s ≫ prec = 𝟙 WithNNO.N := by
@@ -585,6 +623,8 @@ lemma succ_prec_id {C : Type u} [Category C] [HasTerminal C]
       Rec_Par_with_NNO_Aterm_fac_succ, ← Category.assoc (prod.lift
       (𝟙 ((⊤_ C) ⨯ WithNNO.N)) (Rec_Par_with_NNO_Aterm (NNO C).zero (prod.fst ≫ prod.snd))),
       Limits.prod.lift_fst, Category.id_comp, Limits.prod.lift_snd]
+
+--Proof of Peano's third axiom
 
 instance {C : Type u} [Category C]
     [HasTerminal C] [WithNNO C] [HasBinaryProducts C] :
@@ -599,7 +639,9 @@ instance {C : Type u} [Category C]
 
 ------------------------------------------------------------------------------------------------
 
---Proof that Finset does not have an NNO
+--Section 10: Proof that Finset does not have an NNO
+
+--Proof that Fin 2 (= {0,1}) has an isomorphic equivalent in Finset
 
 theorem isFinsetType_fin_two : IsFinsetType α (ULift (Fin 2)) := by
   classical
@@ -608,9 +650,12 @@ theorem isFinsetType_fin_two : IsFinsetType α (ULift (Fin 2)) := by
   apply Fintype.equivOfCardEq
   rw [Fintype.card_ulift, Fintype.card_fin, Fintype.card_coe, Finset.card_pair hab]
 
+--Definition of Fin 2 embedded in Finset
+
 def finTwoObj : (IsFinsetType α).FullSubcategory :=
   ⟨ULift (Fin 2), isFinsetType_fin_two α⟩
 
+-- Proof that, if Finset has an NNO, the function s is not surjective
 
 lemma Finset_NNO_s_not_surj (NatObj : WithNNO (IsFinsetType α).FullSubcategory) :
     ¬ Function.Surjective (NatObj.isNNO.s) := by
@@ -646,21 +691,59 @@ lemma Finset_NNO_s_not_surj (NatObj : WithNNO (IsFinsetType α).FullSubcategory)
       ConcreteCategory.comp_apply, NatObj.isNNO.fac_zero]
     exact absurd (ULift.up.inj ((hf.symm.trans this).trans hg)) (by decide)
 
-#check Finset_NNO_s_not_surj
+--Proof that the inclusion functor Finset ⥤ Type u maps monomorphisms into monomorphisms
+
+instance : Functor.PreservesMonomorphisms ((IsFinsetType α).ι) :=
+{
+  preserves {X Y} f := by
+    intro mono_f; dsimp
+    apply (CategoryTheory.mono_iff_injective f.hom).mpr
+    unfold Function.Injective
+    intro x1 x2 hf
+    let oneFinset : Finset α := {default}
+    let oneObj : (IsFinsetType α).FullSubcategory :=
+      FullSubcategory.mk (oneFinset : Type u) ⟨oneFinset, ⟨Equiv.refl _⟩⟩
+    let g : oneObj ⟶ X := homMk (TypeCat.ofHom (fun _ : (oneFinset : Type u) => x1))
+    let h : oneObj ⟶ X := homMk (TypeCat.ofHom (fun _ : (oneFinset : Type u) => x2))
+    have : g ≫ f = h ≫ f := by
+      ext z
+      simp [g, h, hf]
+    have : g = h := mono_f.right_cancellation g h this
+    have hpoint :
+        ⇑(ConcreteCategory.hom g) default = ⇑(ConcreteCategory.hom h) default := by
+      simpa using congrArg (fun k => ⇑(ConcreteCategory.hom k) default) this
+    change x1 = x2
+    dsimp [g, h] at hpoint
+    exact hpoint
+}
+
+example : Functor.PreservesMonomorphisms ((IsFinsetType α).ι) := inferInstance
+
+-- Proof that, with the same hypothesis, the function s is injective
+
+lemma Finset_NNO_s_inj (NatObj : WithNNO (IsFinsetType α).FullSubcategory) :
+    Function.Injective (NatObj.isNNO.s) := by
+    apply (CategoryTheory.mono_iff_injective ((IsFinsetType α).ι.map NatObj.isNNO.s)).mp
+    apply (CategoryTheory.Functor.mono_map_iff_mono (IsFinsetType α).ι NatObj.isNNO.s).mpr
+    exact inferInstance
+
+--Key result
 
 lemma Finset_without_NNO : ¬ Nonempty (WithNNO (IsFinsetType α).FullSubcategory) := by
   by_contra h1
   have NatObj : WithNNO (IsFinsetType α).FullSubcategory := Classical.choice h1
-  have s_inj : Function.Injective (NatObj.isNNO.s) := by
-    apply (CategoryTheory.mono_iff_injective ((IsFinsetType α).ι.map NatObj.isNNO.s)).mp
-    have : Functor.PreservesMonomorphisms ((IsFinsetType α).ι) := by sorry
-    apply (CategoryTheory.Functor.mono_map_iff_mono (IsFinsetType α).ι NatObj.isNNO.s).mpr
-    exact inferInstance
-  have : Finite ((IsFinsetType α).ι.obj WithNNO.N) := by sorry
+  have : Finite ((IsFinsetType α).ι.obj WithNNO.N) := by
+    dsimp
+    rcases NatObj.N.property with ⟨s, ⟨e⟩⟩
+    exact Finite.of_equiv (s : Type u) e.symm
   exact (Finset_NNO_s_not_surj α NatObj) ((Function.Injective.surjective_of_finite
-          (Equiv.refl ((IsFinsetType α).ι.obj NatObj.N))) s_inj)
+          (Equiv.refl ((IsFinsetType α).ι.obj NatObj.N))) (Finset_NNO_s_inj α NatObj))
 
---NNO as initial algebra
+-----------------------------------------------------------------------------------------
+
+--Section 11: NNO as initial algebra
+
+--Definition of the functor T on which the algebra is built
 
 noncomputable def T {C : Type u} [Category C] [HasTerminal C]
       [HasBinaryCoproducts C] : Functor C C where
@@ -668,15 +751,21 @@ noncomputable def T {C : Type u} [Category C] [HasTerminal C]
 obj X := Limits.coprod (⊤_ C) X
 map f := Limits.coprod.map (𝟙 (⊤_ C)) f
 
+--Definition of the NNO as an initial algebra (equipped with the [0,s] morphism)
+
 noncomputable def Nalg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       [HasBinaryCoproducts C] : Endofunctor.Algebra (T : Functor C C) where
 
 a := WithNNO.N
 str := Limits.coprod.desc (NNO C).zero (NNO C).s
 
+--Definition of a morphism of T-algebras Nalg ⟶ A (with A a generic T-algebra)
+
 noncomputable def aux1_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C)) : WithNNO.N ⟶ A.a :=
       (NNO C).recursion (Limits.coprod.inl ≫ A.str) (Limits.coprod.inr ≫ A.str)
+
+--Banal result about coproduct diagrams
 
 lemma aux_lemma_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C)) :
@@ -684,6 +773,8 @@ lemma aux_lemma_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       apply Limits.coprod.hom_ext
       · rw[Limits.coprod.inl_desc]
       · rw[Limits.coprod.inr_desc]
+
+--Proof that aux1_init_alg is a morphism of T-algebras
 
 noncomputable def init_mor {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C)) :
@@ -695,6 +786,8 @@ h := by
     rw[Limits.coprod.desc_comp, (NNO C).fac_zero, (NNO C).fac_succ]
     conv_rhs => rw[← Category.id_comp (Limits.coprod.inl ≫ A.str), ← Limits.coprod.map_desc,
     Category.id_comp, aux_lemma_init_alg]
+
+--Proof that it is the only morphism of T-algebras Nalg ⟶ A
 
 lemma init_mor_uniq {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       [HasBinaryCoproducts C] (A : Endofunctor.Algebra (T : Functor C C))
@@ -717,6 +810,8 @@ lemma init_mor_uniq {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
         rw[Limits.coprod.inr_desc, Limits.coprod.inr_desc] at helper
         exact helper.symm
 
+--Proof that Nalg is an initial object in the category of T-algebras
+
 noncomputable def NNO_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
       [HasBinaryCoproducts C] : IsInitial (Nalg : Endofunctor.Algebra (T : Functor C C)) := by
       unfold IsInitial
@@ -726,5 +821,6 @@ noncomputable def NNO_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNN
         uniq s m := by
           intros
           exact init_mor_uniq s.pt m
-        }
+            }
 
+-----------------------------------------------------------------------------------------------
