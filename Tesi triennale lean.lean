@@ -19,6 +19,9 @@ open CategoryTheory Limits WalkingPair ObjectProperty
 set_option autoImplicit false
 set_option checkBinderAnnotations false
 
+--Main definitions
+
+--isNNO
 universe u
  ----------------------------------------------------------------------
 
@@ -373,7 +376,7 @@ noncomputable def fifth_axiom {C : Type u} [Category C]
 
 
 
-
+/-
 RecPar_fac_zero {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
     Limits.prod.map (𝟙 A) (NNO C).zero ≫ RecPar f g = Limits.prod.fst ≫ f
@@ -388,10 +391,10 @@ uniq {A B : C} (f : A ⟶ B)
     (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
     (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
     Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = RecPar f g
+-/
 
-
---Definition that extracts a morphism N x B ⟶ B
--- from a morphism ⊤ x N x B ⟶ B in the canonical way
+/- Definition that extracts a morphism N x B ⟶ B
+ from a morphism ⊤ x N x B ⟶ B in the canonical way -/
 
 noncomputable def aux_function1_Aterm {C : Type u} [Category C]
   [HasTerminal C] [WithNNO C] [HasBinaryProducts C]
@@ -596,10 +599,10 @@ theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
 
 -- Section 8b: Recursion theorem (general case)
 
---noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
+/-noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
       [WithNNO C] [HasBinaryProducts C] [MonoidalCategory C] [CartesianClosed C]
       {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :=
-      CartesianClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f)
+      CartesianClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f) -/
 
 
 --------------------------------------------------------------------------------------------
