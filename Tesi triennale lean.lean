@@ -599,10 +599,18 @@ theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
 
 -- Section 8b: Recursion theorem (general case)
 
-/-noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasBinaryProducts C] [MonoidalCategory C] [CartesianClosed C]
+variable {C : Type u} [Category C] [HasFiniteProducts C]
+
+attribute [local instance] CartesianMonoidalCategory.ofHasFiniteProducts
+
+#synth MonoidalCategory C
+
+noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
+      [WithNNO C] /- [HasBinaryProducts C] [MonoidalCategory C] -/
+      [HasFiniteProducts C]
+      [MonoidalClosed C]
       {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :=
-      CartesianClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f) -/
+      MonoidalClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f)
 
 
 --------------------------------------------------------------------------------------------
