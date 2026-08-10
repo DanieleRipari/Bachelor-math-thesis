@@ -14,14 +14,31 @@ import Mathlib.SetTheory.Cardinal.Arithmetic
 import Mathlib.CategoryTheory.Monoidal.Closed.Cartesian
 import Mathlib.CategoryTheory.Endofunctor.Algebra
 import Mathlib.CategoryTheory.ObjectProperty.FullSubcategory
+import Mathlib.CategoryTheory.Monoidal.Cartesian.Basic
 open CategoryTheory Limits WalkingPair ObjectProperty
 
 set_option autoImplicit false
-set_option checkBinderAnnotations false
 
---Main definitions
 
---isNNO
+/-
+Main definitions
+
+WithNNO
+WithMyNNO
+Rec_Par_with_NNO
+
+Main results
+
+NNO_unique_up_to_iso
+not_fourth_axiom_Nterm
+fourth_axiom
+fifth_axiom
+Rec_Par_with_NNO_fac_zero
+Rec_Par_with_NNO_fac_succ
+Rec_Par_with_NNO_unique
+Finset_without_NNO
+NNO_init_alg
+-/
 universe u
  ----------------------------------------------------------------------
 
@@ -374,25 +391,6 @@ noncomputable def fifth_axiom {C : Type u} [Category C]
 
 --Section 8a: Recursion theorem (case of A = ⊤)
 
-
-
-/-
-RecPar_fac_zero {A B : C} (f : A ⟶ B)
-    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
-    Limits.prod.map (𝟙 A) (NNO C).zero ≫ RecPar f g = Limits.prod.fst ≫ f
-
-RecPar_fac_succ {A B : C} (f : A ⟶ B)
-    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
-    Limits.prod.map (𝟙 A) (NNO C).s ≫ RecPar f g =
-    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) (RecPar f g) ≫ g
-
-uniq {A B : C} (f : A ⟶ B)
-    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B )
-    (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
-    (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
-    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = RecPar f g
--/
-
 /- Definition that extracts a morphism N x B ⟶ B
  from a morphism ⊤ x N x B ⟶ B in the canonical way -/
 
@@ -598,26 +596,159 @@ theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
 --------------------------------------------------------------------------------------------
 
 -- Section 8b: Recursion theorem (general case)
-
-variable {C : Type u} [Category C] [HasFiniteProducts C]
-
+example (C : Type u) [Category C] [HasTerminal C] [HasBinaryProducts C] : HasFiniteProducts C := sorry
 attribute [local instance] CartesianMonoidalCategory.ofHasFiniteProducts
 
-#synth MonoidalCategory C
+--Definition of a morphism ⊤ ⟶ (A ⟹ B) extracted from the morphism f : A ⟶ B
 
 noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] /- [HasBinaryProducts C] [MonoidalCategory C] -/
-      [HasFiniteProducts C]
-      [MonoidalClosed C]
-      {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :=
-      MonoidalClosed.curry ((Limits.prod.leftUnitor A).hom ≫ f)
+      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      {A B : C} (f : A ⟶ B) : ⊤_ C ⟶ (ihom A).obj B :=
+      MonoidalClosed.curry ((Limits.prod.rightUnitor A).hom ≫ f)
+
+--Definition of a morphism A x N x (A ⟹ B) ⟶ B from the morphism g : A x N x B ⟶ B
+
+noncomputable def aux_function2_Rec_Par {C : Type u} [Category C] [HasTerminal C]
+      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      {A B : C} (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+      Limits.prod A (Limits.prod WithNNO.N ((ihom A).obj B)) ⟶ B :=
+      (Limits.prod.lift
+      ((Limits.prod.associator A WithNNO.N ((ihom A).obj B)).inv ≫ Limits.prod.fst)
+      (Limits.prod.lift (Limits.prod.fst) (Limits.prod.snd ≫ Limits.prod.snd)
+      ≫ (ihom.ev A).app B)) ≫ g
+
+--Definition of the exponential transpose of the previous morphism
+
+noncomputable def aux_function3_Rec_Par {C : Type u} [Category C] [HasTerminal C]
+      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      {A B : C} (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+      Limits.prod (Limits.prod (⊤_ C) (WithNNO.N)) ((ihom A).obj B) ⟶ (ihom A).obj B :=
+      (Limits.prod.associator (⊤_ C) (WithNNO.N) ((ihom A).obj B)).hom ≫
+      (Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).hom ≫
+      MonoidalClosed.curry (aux_function2_Rec_Par g)
+
+--Definition of the recursion morphism (in the case A = ⊤) with aux1 and aux3
+
+noncomputable def aux_function4_Rec_Par {C : Type u} [Category C] [HasTerminal C]
+      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+      WithNNO.N ⟶ (ihom A).obj B :=
+      (Limits.prod.leftUnitor WithNNO.N).inv ≫
+      Rec_Par_with_NNO_Aterm (aux_function1_Rec_Par f) (aux_function3_Rec_Par g)
+
+--Definition of the seeked recursion morphism (in the general case)
+
+noncomputable def Rec_Par_with_NNO {C : Type u} [Category C] [HasTerminal C]
+      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+      Limits.prod A WithNNO.N ⟶ B :=
+      Limits.prod.map (𝟙 A) (aux_function4_Rec_Par f g) ≫ (ihom.ev A).app B
+
+--Proof of the universal property of the exponential
+
+theorem expon_univ_prop {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {X Y Z : C}
+    (f : Limits.prod X Y ⟶ Z) :
+    Limits.prod.map (𝟙 X) (MonoidalClosed.curry f) ≫ (ihom.ev X).app Z = f := by
+    have h1 := MonoidalClosed.uncurry_curry f
+    rw[MonoidalClosed.uncurry_eq] at h1
+    have h2 : MonoidalCategoryStruct.whiskerLeft X (MonoidalClosed.curry f) =
+    Limits.prod.map (𝟙 X) (MonoidalClosed.curry f) := by
+        apply Limits.prod.hom_ext
+        · exact ((CartesianMonoidalCategory.whiskerLeft_fst _ _).trans
+          ((Limits.prod.map_fst _ _).trans (Category.comp_id _)).symm)
+        · exact (CartesianMonoidalCategory.whiskerLeft_snd _ _).trans (Limits.prod.map_snd _ _).symm
+    rw [h2] at h1
+    exact h1
+
+--Proof of the commutativity of the left side of the diagram
+
+theorem Rec_Par_with_NNO_fac_zero {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+    Limits.prod.map (𝟙 A) (NNO C).zero ≫ Rec_Par_with_NNO f g = Limits.prod.fst ≫ f := by
+    rw[Rec_Par_with_NNO, Limits.prod.map_map_assoc, Category.id_comp, aux_function4_Rec_Par,
+    Rec_Par_with_NNO_Aterm, ← Category.assoc ((Limits.prod.leftUnitor WithNNO.N).inv)
+    ((Limits.prod.leftUnitor WithNNO.N).hom)
+    (aux_function2_Aterm (aux_function1_Rec_Par f) (aux_function3_Rec_Par g) ≫ prod.snd),
+    (Limits.prod.leftUnitor WithNNO.N).inv_hom_id, Category.id_comp, aux_function2_Aterm,
+    ← Category.assoc, (NNO C).fac_zero, Limits.prod.lift_snd,
+    aux_function1_Rec_Par, Limits.prod.rightUnitor_hom]
+    exact expon_univ_prop (Limits.prod.fst ≫ f)
 
 
+
+
+theorem Rec_Par_with_NNO_fac_succ {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+    Limits.prod.map (𝟙 A) (NNO C).s ≫ Rec_Par_with_NNO f g =
+    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) (Rec_Par_with_NNO f g) ≫ g := by
+    rw[Rec_Par_with_NNO, Limits.prod.map_map_assoc, Category.id_comp, aux_function4_Rec_Par,
+    Rec_Par_with_NNO_Aterm, ← Category.assoc ((Limits.prod.leftUnitor WithNNO.N).inv)
+    ((Limits.prod.leftUnitor WithNNO.N).hom)
+    (aux_function2_Aterm (aux_function1_Rec_Par f) (aux_function3_Rec_Par g) ≫ prod.snd),
+    (Limits.prod.leftUnitor WithNNO.N).inv_hom_id, Category.id_comp, aux_function2_Aterm,
+    ← Category.assoc, (NNO C).fac_succ, ← Category.comp_id (𝟙 A),
+    Category.assoc, ← Limits.prod.map_map_assoc, Limits.prod.lift_snd,
+    aux_function1_Aterm, aux_function3_Rec_Par]
+    have : ((Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).inv ≫
+    (Limits.prod.associator (⊤_ C) WithNNO.N ((ihom A).obj B)).inv ≫
+            (Limits.prod.associator (⊤_ C) WithNNO.N ((ihom A).obj B)).hom ≫
+              (Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).hom ≫
+              MonoidalClosed.curry (aux_function2_Rec_Par g)) =
+              (((Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).inv ≫
+              ((Limits.prod.associator (⊤_ C) WithNNO.N ((ihom A).obj B)).inv ≫
+            (Limits.prod.associator (⊤_ C) WithNNO.N ((ihom A).obj B)).hom) ≫
+              (Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).hom) ≫
+              MonoidalClosed.curry (aux_function2_Rec_Par g))
+             := by
+             simp only [Category.assoc]
+    rw[this, (Limits.prod.associator (⊤_ C) WithNNO.N ((ihom A).obj B)).inv_hom_id,
+    Category.id_comp, (Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).inv_hom_id,
+    Category.id_comp]
+    erw [expon_univ_prop (aux_function2_Rec_Par g)]
+
+
+theorem Rec_Par_with_NNO_unique {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
+    (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
+    (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
+    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = Rec_Par_with_NNO f g := by sorry
+
+noncomputable def NNO_sum {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] :
+    Limits.prod (WithNNO.N (C := C)) (WithNNO.N) ⟶ WithNNO.N :=
+    Rec_Par_with_NNO (𝟙 (WithNNO.N)) (Limits.prod.snd ≫ (NNO C).s)
+
+theorem NNO_sum_assoc {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] :
+    Limits.prod.map NNO_sum (𝟙 (WithNNO.N (C := C)) ) ≫ NNO_sum =
+    (Limits.prod.associator WithNNO.N WithNNO.N WithNNO.N).hom ≫ Limits.prod.map (𝟙 WithNNO.N) NNO_sum ≫ NNO_sum := by
+    have h1 : Limits.prod.map NNO_sum (𝟙 (WithNNO.N (C := C)) ) ≫ NNO_sum =
+    Rec_Par_with_NNO (NNO_sum) (Limits.prod.snd ≫ (NNO C).s) := by
+      apply Rec_Par_with_NNO_unique
+
+variable {C : Type u}
+variable [Category C] [HasFiniteProducts C] [MonoidalClosed C]
+variable (A X : C)
+variable (f : X ⟶ X)
+variable (g : X ⟶ (ihom A).obj X)
+#check (ihom A).obj X
+#check (ihom A).obj X
+#check (MonoidalCategory.tensorLeft A).obj X
+#check (Limits.prod.associator A A A).inv
+#check (ihom A).map f
+#check MonoidalClosed.uncurry_eq
+#check MonoidalCategory.tensorHom_def
+#check CartesianMonoidalCategory.ofChosenFiniteProducts.tensorHom
 --------------------------------------------------------------------------------------------
 
 --Section 9: Peano's third axiom
 
 --Definition of the left inverse of s (namely, the function precedent)
+
 noncomputable def prec {C : Type u} [Category C] [HasTerminal C]
       [WithNNO C] [HasBinaryProducts C] : WithNNO.N (C := C) ⟶ WithNNO.N :=
       (Limits.prod.leftUnitor WithNNO.N).inv ≫
@@ -654,6 +785,7 @@ instance {C : Type u} [Category C]
 
 --Proof that Fin 2 (= {0,1}) has an isomorphic equivalent in Finset
 
+omit [Inhabited α] in
 theorem isFinsetType_fin_two : IsFinsetType α (ULift (Fin 2)) := by
   classical
   obtain ⟨a, b, hab⟩ := exists_pair_ne α
@@ -834,4 +966,4 @@ noncomputable def NNO_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNN
           exact init_mor_uniq s.pt m
             }
 
------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
