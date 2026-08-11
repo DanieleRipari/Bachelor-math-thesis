@@ -26,6 +26,8 @@ Main definitions
 WithNNO
 WithMyNNO
 Rec_Par_with_NNO
+NNO_sum
+NNO_product
 
 Main results
 
@@ -127,8 +129,11 @@ instance : (IsFinsetType α).IsClosedUnderLimitsOfShape (Discrete Limits.Walking
 
 --Inferring the instances
 
-example : HasTerminal (IsFinsetType α).FullSubcategory := inferInstance
-example : HasBinaryProducts (IsFinsetType α).FullSubcategory := inferInstance
+omit [Infinite α] in
+theorem Finset_has_terminal : HasTerminal (IsFinsetType α).FullSubcategory := inferInstance
+omit [Inhabited α] in
+theorem Finset_has_binary_products : HasBinaryProducts (IsFinsetType α).FullSubcategory :=
+        inferInstance
 
 
 -------------------------------------------------------------------------
@@ -241,6 +246,33 @@ lemma banal_recursion {C : Type u} [Category C] [HasTerminal C]
           · rw[Category.comp_id]
           · rw[Category.comp_id, Category.id_comp]
         exact eq_1.trans eq_2.symm
+
+noncomputable def IsNNO.ofIso {C : Type u} [Category C] [HasTerminal C]
+    {N1 N2 : C} (n1 : IsNNO N1) (Equiv : Iso N1 N2) : IsNNO N2 :=
+    {
+      zero := n1.zero ≫ Equiv.hom
+      s := Equiv.inv ≫ n1.s ≫ Equiv.hom
+      recursion f g := Equiv.inv ≫ n1.recursion f g
+      fac_zero f g := by
+        rw[Category.assoc, ← Category.assoc (Equiv.hom), Equiv.hom_inv_id,
+        Category.id_comp, n1.fac_zero]
+      fac_succ f g := by
+        rw[Category.assoc, Category.assoc, ← Category.assoc (Equiv.hom),
+        Equiv.hom_inv_id, Category.id_comp, n1.fac_succ, Category.assoc]
+      uniq f g h hyp_zero hyp_succ := by
+        rw[Category.assoc] at hyp_zero
+        have hyp_succ' : Equiv.hom ≫ (Equiv.inv ≫ n1.s ≫ Equiv.hom) ≫ h =
+        Equiv.hom ≫ h ≫ g := congr_arg (Equiv.hom ≫ ·) hyp_succ
+        rw[← Category.assoc, ← Category.assoc (Equiv.hom) (Equiv.inv),
+        Equiv.hom_inv_id, Category.id_comp, Category.assoc] at hyp_succ'
+        nth_rewrite 2 [← Category.assoc] at hyp_succ'
+        have goal : Equiv.hom ≫ h = n1.recursion f g :=
+        n1.uniq f g (Equiv.hom ≫ h) hyp_zero hyp_succ'
+        have goal' : Equiv.inv ≫ Equiv.hom ≫ h = Equiv.inv ≫ n1.recursion f g :=
+          congr_arg (Equiv.inv ≫ ·) goal
+        rw[← Category.assoc, Equiv.inv_hom_id, Category.id_comp] at goal'
+        exact goal'
+    }
 
 --Proof that the NNO is unique up to isomorphism
 
@@ -596,20 +628,24 @@ theorem Rec_Par_with_NNO_Aterm_unique {C : Type u} [Category C]
 --------------------------------------------------------------------------------------------
 
 -- Section 8b: Recursion theorem (general case)
-example (C : Type u) [Category C] [HasTerminal C] [HasBinaryProducts C] : HasFiniteProducts C := sorry
+
+instance (C : Type u) [Category C] [HasTerminal C] [HasBinaryProducts C] :
+    HasFiniteProducts C :=
+  CategoryTheory.hasFiniteProducts_of_has_binary_and_terminal
+
 attribute [local instance] CartesianMonoidalCategory.ofHasFiniteProducts
 
 --Definition of a morphism ⊤ ⟶ (A ⟹ B) extracted from the morphism f : A ⟶ B
 
 noncomputable def aux_function1_Rec_Par {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C]
       {A B : C} (f : A ⟶ B) : ⊤_ C ⟶ (ihom A).obj B :=
       MonoidalClosed.curry ((Limits.prod.rightUnitor A).hom ≫ f)
 
 --Definition of a morphism A x N x (A ⟹ B) ⟶ B from the morphism g : A x N x B ⟶ B
 
 noncomputable def aux_function2_Rec_Par {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C]
       {A B : C} (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
       Limits.prod A (Limits.prod WithNNO.N ((ihom A).obj B)) ⟶ B :=
       (Limits.prod.lift
@@ -620,7 +656,7 @@ noncomputable def aux_function2_Rec_Par {C : Type u} [Category C] [HasTerminal C
 --Definition of the exponential transpose of the previous morphism
 
 noncomputable def aux_function3_Rec_Par {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C]
       {A B : C} (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
       Limits.prod (Limits.prod (⊤_ C) (WithNNO.N)) ((ihom A).obj B) ⟶ (ihom A).obj B :=
       (Limits.prod.associator (⊤_ C) (WithNNO.N) ((ihom A).obj B)).hom ≫
@@ -630,7 +666,7 @@ noncomputable def aux_function3_Rec_Par {C : Type u} [Category C] [HasTerminal C
 --Definition of the recursion morphism (in the case A = ⊤) with aux1 and aux3
 
 noncomputable def aux_function4_Rec_Par {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C]
       {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
       WithNNO.N ⟶ (ihom A).obj B :=
       (Limits.prod.leftUnitor WithNNO.N).inv ≫
@@ -639,7 +675,7 @@ noncomputable def aux_function4_Rec_Par {C : Type u} [Category C] [HasTerminal C
 --Definition of the seeked recursion morphism (in the general case)
 
 noncomputable def Rec_Par_with_NNO {C : Type u} [Category C] [HasTerminal C]
-      [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C]
+      [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C]
       {A B : C} (f : A ⟶ B) (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
       Limits.prod A WithNNO.N ⟶ B :=
       Limits.prod.map (𝟙 A) (aux_function4_Rec_Par f g) ≫ (ihom.ev A).app B
@@ -647,7 +683,7 @@ noncomputable def Rec_Par_with_NNO {C : Type u} [Category C] [HasTerminal C]
 --Proof of the universal property of the exponential
 
 theorem expon_univ_prop {C : Type u} [Category C] [HasTerminal C]
-    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {X Y Z : C}
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {X Y Z : C}
     (f : Limits.prod X Y ⟶ Z) :
     Limits.prod.map (𝟙 X) (MonoidalClosed.curry f) ≫ (ihom.ev X).app Z = f := by
     have h1 := MonoidalClosed.uncurry_curry f
@@ -664,7 +700,7 @@ theorem expon_univ_prop {C : Type u} [Category C] [HasTerminal C]
 --Proof of the commutativity of the left side of the diagram
 
 theorem Rec_Par_with_NNO_fac_zero {C : Type u} [Category C] [HasTerminal C]
-    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
     Limits.prod.map (𝟙 A) (NNO C).zero ≫ Rec_Par_with_NNO f g = Limits.prod.fst ≫ f := by
     rw[Rec_Par_with_NNO, Limits.prod.map_map_assoc, Category.id_comp, aux_function4_Rec_Par,
@@ -676,11 +712,78 @@ theorem Rec_Par_with_NNO_fac_zero {C : Type u} [Category C] [HasTerminal C]
     aux_function1_Rec_Par, Limits.prod.rightUnitor_hom]
     exact expon_univ_prop (Limits.prod.fst ≫ f)
 
+--Technical results needed in the proof that the right side commutes
 
+theorem aux1_Rec_Par_fac_succ {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+    (NNO C).recursion (prod.lift (NNO C).zero (aux_function1_Rec_Par f))
+    (prod.lift (prod.fst ≫ (NNO C).s)
+    (MonoidalClosed.curry (prod.lift (prod.lift (prod.lift prod.fst (prod.snd ≫ prod.fst))
+    (prod.snd ≫ prod.snd) ≫ prod.fst)
+    (prod.lift prod.fst (prod.snd ≫ prod.snd) ≫ (ihom.ev A).app B) ≫ g))) ≫ prod.fst =
+     𝟙 WithNNO.N := by
+      apply banal_recursion
+      · rw[← Category.assoc, (NNO C).fac_zero, Limits.prod.lift_fst]
+      · conv_lhs => rw[← Category.assoc, (NNO C).fac_succ, Category.assoc, Limits.prod.lift_fst,
+        Limits.prod.lift_fst]
+        conv_rhs => rw[Limits.prod.lift_fst]
+        simp only [Category.assoc]
 
+theorem aux2_Rec_Par_fac_succ {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+    prod.map (𝟙 A)
+        ((NNO C).recursion (prod.lift (NNO C).zero (aux_function1_Rec_Par f))
+        (prod.lift (prod.fst ≫ (NNO C).s) (MonoidalClosed.curry
+        (prod.lift ((prod.associator A WithNNO.N ((ihom A).obj B)).inv ≫ prod.fst)
+        (prod.lift prod.fst (prod.snd ≫ prod.snd) ≫ (ihom.ev A).app B) ≫ g)))) ≫
+      prod.lift prod.fst (prod.snd ≫ prod.snd) =
+      prod.map (𝟙 A)
+      ((NNO C).recursion (prod.lift (NNO C).zero (aux_function1_Rec_Par f))
+      (prod.lift (prod.fst ≫ (NNO C).s) (MonoidalClosed.curry
+      (prod.lift ((prod.associator A WithNNO.N ((ihom A).obj B)).inv ≫ prod.fst)
+      (prod.lift prod.fst (prod.snd ≫ prod.snd) ≫ (ihom.ev A).app B) ≫ g))) ≫ prod.snd) := by
+        apply Limits.prod.hom_ext
+        · rw[Category.assoc, Limits.prod.lift_fst, Limits.prod.map_fst, Limits.prod.map_fst]
+        · rw[Category.assoc, Limits.prod.lift_snd, ← Category.assoc, Limits.prod.map_snd,
+          Limits.prod.map_snd]
+          simp only [Category.assoc]
+
+theorem aux3_Rec_Par_fac_succ {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+    (prod.map (𝟙 A)
+      ((NNO C).recursion (prod.lift (NNO C).zero (aux_function1_Rec_Par f))
+        (prod.lift (prod.fst ≫ (NNO C).s)
+          (MonoidalClosed.curry
+            (prod.lift ((prod.associator A WithNNO.N ((ihom A).obj B)).inv ≫ prod.fst)
+                (prod.lift prod.fst (prod.snd ≫ prod.snd) ≫ (ihom.ev A).app B) ≫
+              g)))) ≫
+    prod.lift ((prod.associator A WithNNO.N ((ihom A).obj B)).inv ≫ prod.fst)
+      (prod.lift prod.fst (prod.snd ≫ prod.snd) ≫ (ihom.ev A).app B)) =
+      prod.lift (𝟙 (A ⨯ WithNNO.N))
+      (prod.map (𝟙 A ≫ 𝟙 A)
+          ((NNO C).recursion (prod.lift (NNO C).zero (aux_function1_Rec_Par f))
+              (prod.lift (prod.fst ≫ (NNO C).s) (MonoidalClosed.curry (aux_function2_Rec_Par g))) ≫
+            prod.snd) ≫
+        (ihom.ev A).app B) := by
+        apply Limits.prod.hom_ext
+        · rw[Category.assoc, Limits.prod.lift_fst, Limits.prod.lift_fst,
+          Limits.prod.associator_inv, Limits.prod.lift_fst, Limits.prod.comp_lift]
+          apply Limits.prod.hom_ext
+          · rw[Limits.prod.lift_fst, Limits.prod.map_fst, Category.comp_id, Category.id_comp]
+          · rw[Limits.prod.lift_snd, ← Category.assoc, Limits.prod.map_snd, Category.assoc]
+            erw[aux1_Rec_Par_fac_succ]
+            rw[Category.comp_id, Category.id_comp]
+        · rw[Limits.prod.lift_snd, Category.assoc, Limits.prod.lift_snd, Category.comp_id,
+          aux_function2_Rec_Par, ← Category.assoc, aux2_Rec_Par_fac_succ]
+          rfl
+
+--Proof of the commutativity of the right side of the diagram
 
 theorem Rec_Par_with_NNO_fac_succ {C : Type u} [Category C] [HasTerminal C]
-    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
     Limits.prod.map (𝟙 A) (NNO C).s ≫ Rec_Par_with_NNO f g =
     Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) (Rec_Par_with_NNO f g) ≫ g := by
@@ -708,44 +811,252 @@ theorem Rec_Par_with_NNO_fac_succ {C : Type u} [Category C] [HasTerminal C]
     Category.id_comp, (Limits.prod.leftUnitor (Limits.prod WithNNO.N ((ihom A).obj B))).inv_hom_id,
     Category.id_comp]
     erw [expon_univ_prop (aux_function2_Rec_Par g)]
+    conv_lhs => rw[aux_function2_Rec_Par, ← Category.assoc]
+    erw [aux3_Rec_Par_fac_succ]
+    rfl
 
+theorem aux1_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
+    (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
+    (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
+    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) :
+    (Limits.prod.leftUnitor WithNNO.N).hom ≫ MonoidalClosed.curry h =
+    Rec_Par_with_NNO_Aterm (aux_function1_Rec_Par f) (aux_function3_Rec_Par g) := by
+    apply Rec_Par_with_NNO_Aterm_unique
+    · rw[Limits.prod.leftUnitor_hom, ← Category.assoc, Limits.prod.map_snd,
+      aux_function1_Rec_Par, Limits.terminal.hom_ext (prod.fst) (prod.snd),
+      Category.assoc]
+      have : (NNO C).zero ≫ MonoidalClosed.curry h =
+      MonoidalClosed.curry ((Limits.prod.rightUnitor A).hom ≫ f) := by
+        apply (MonoidalClosed.eq_curry_iff ((NNO C).zero ≫ MonoidalClosed.curry h)
+        ((Limits.prod.rightUnitor A).hom ≫ f)).mp
+      sorry
+
+
+theorem aux2_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
+    (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
+    (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
+    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) :
+    MonoidalClosed.curry h = (aux_function4_Rec_Par f g) := by
+    rw[aux_function4_Rec_Par, ← Category.id_comp (MonoidalClosed.curry h),
+    ← (Limits.prod.leftUnitor (WithNNO.N)).inv_hom_id, Category.assoc,
+    ]
 
 theorem Rec_Par_with_NNO_unique {C : Type u} [Category C] [HasTerminal C]
-    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
     (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
     (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
     Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = Rec_Par_with_NNO f g := by sorry
 
+------------------------------------------------------------------------------------------------
+
+--Section 9: Definition and properties of the sum
+
+--Definition of the sum in the context of NNO
+
 noncomputable def NNO_sum {C : Type u} [Category C] [HasTerminal C]
-    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] :
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
     Limits.prod (WithNNO.N (C := C)) (WithNNO.N) ⟶ WithNNO.N :=
     Rec_Par_with_NNO (𝟙 (WithNNO.N)) (Limits.prod.snd ≫ (NNO C).s)
 
-theorem NNO_sum_assoc {C : Type u} [Category C] [HasTerminal C]
-    [WithNNO C] [HasFiniteProducts C] [MonoidalClosed C] :
+--Proof that the sum is associative
+
+--Technical result
+
+theorem aux1_NNO_sum_assoc {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] (A : C) (f : A ⟶ WithNNO.N) :
+    (prod.map (𝟙 (WithNNO.N ⨯ WithNNO.N)) f ≫
+    (prod.associator WithNNO.N WithNNO.N WithNNO.N).hom) =
+      (Limits.prod.associator (WithNNO.N) (WithNNO.N) (A)).hom ≫
+      Limits.prod.map (𝟙 WithNNO.N) (Limits.prod.map (𝟙 WithNNO.N) f) := by
+        apply Limits.prod.hom_ext
+        · rw[Category.assoc, Limits.prod.associator_hom, Limits.prod.associator_hom,
+          Limits.prod.lift_fst, ← Category.assoc, Limits.prod.map_fst,
+          Category.comp_id, Category.assoc, Limits.prod.map_fst,
+          Category.comp_id, Limits.prod.lift_fst]
+        · rw[Category.assoc, Limits.prod.associator_hom,
+          Limits.prod.associator_hom, Limits.prod.lift_snd,
+          Category.assoc, Limits.prod.map_snd, ← Category.assoc, Limits.prod.lift_snd]
+          apply Limits.prod.hom_ext
+          · rw[Category.assoc, Category.assoc, Limits.prod.lift_fst, Limits.prod.map_fst,
+            Category.comp_id, ← Category.assoc, Limits.prod.lift_fst,
+             Limits.prod.map_fst, Category.comp_id]
+          · rw[Category.assoc, Category.assoc, Limits.prod.lift_snd, Limits.prod.map_snd,
+            Limits.prod.map_snd, ← Category.assoc, Limits.prod.lift_snd]
+
+--Proof that the first function satisfies the recursion property
+
+theorem NNO_sum_assoc_part1 {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
     Limits.prod.map NNO_sum (𝟙 (WithNNO.N (C := C)) ) ≫ NNO_sum =
-    (Limits.prod.associator WithNNO.N WithNNO.N WithNNO.N).hom ≫ Limits.prod.map (𝟙 WithNNO.N) NNO_sum ≫ NNO_sum := by
-    have h1 : Limits.prod.map NNO_sum (𝟙 (WithNNO.N (C := C)) ) ≫ NNO_sum =
     Rec_Par_with_NNO (NNO_sum) (Limits.prod.snd ≫ (NNO C).s) := by
       apply Rec_Par_with_NNO_unique
+      · rw[Limits.prod.map_map_assoc, Category.id_comp, Category.comp_id,
+        ← Category.comp_id (NNO_sum), ← Category.id_comp ((NNO C).zero),
+        ← Limits.prod.map_map_assoc, Category.comp_id]
+        rw[NNO_sum, Rec_Par_with_NNO_fac_zero, ← Category.assoc,
+        Limits.prod.map_fst, Category.comp_id]
+      · conv_lhs => rw[Limits.prod.map_map_assoc, Category.id_comp, Category.comp_id,
+        ← Category.comp_id (NNO_sum), ← Category.id_comp ((NNO C).s),
+        ← Limits.prod.map_map_assoc, Category.comp_id, NNO_sum, Rec_Par_with_NNO_fac_succ,
+        ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+        (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))),
+        Limits.prod.lift_snd]
+        conv_rhs => rw[← Category.assoc (prod.lift (𝟙 ((WithNNO.N ⨯ WithNNO.N) ⨯ WithNNO.N))
+        (prod.map NNO_sum (𝟙 WithNNO.N) ≫ NNO_sum)),
+        Limits.prod.lift_snd, NNO_sum]
+        simp only [Category.assoc]
 
-variable {C : Type u}
-variable [Category C] [HasFiniteProducts C] [MonoidalClosed C]
-variable (A X : C)
-variable (f : X ⟶ X)
-variable (g : X ⟶ (ihom A).obj X)
-#check (ihom A).obj X
-#check (ihom A).obj X
-#check (MonoidalCategory.tensorLeft A).obj X
-#check (Limits.prod.associator A A A).inv
-#check (ihom A).map f
-#check MonoidalClosed.uncurry_eq
-#check MonoidalCategory.tensorHom_def
-#check CartesianMonoidalCategory.ofChosenFiniteProducts.tensorHom
+--Proof that the second function satisfies the recursion property
+
+theorem NNO_sum_assoc_part2 {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
+    (Limits.prod.associator WithNNO.N WithNNO.N WithNNO.N).hom ≫
+    Limits.prod.map (𝟙 WithNNO.N) NNO_sum ≫ NNO_sum =
+    Rec_Par_with_NNO (NNO_sum) (Limits.prod.snd ≫ (NNO C).s) := by
+    apply Rec_Par_with_NNO_unique
+    · rw[← Category.assoc, aux1_NNO_sum_assoc, Category.assoc,
+      ← Category.assoc (prod.map (𝟙 WithNNO.N) (prod.map (𝟙 WithNNO.N) (NNO C).zero)),
+      Limits.prod.map_map, NNO_sum, Rec_Par_with_NNO_fac_zero,
+      Limits.prod.associator_hom, ← Category.assoc, Limits.prod.lift_map,
+      Category.comp_id, Category.comp_id, Category.comp_id]
+      have : (prod.lift (Limits.prod.fst ≫ Limits.prod.fst)
+      (prod.lift (Limits.prod.fst ≫ Limits.prod.snd) Limits.prod.snd ≫ Limits.prod.fst)) =
+      (Limits.prod.fst : Limits.prod (Limits.prod WithNNO.N WithNNO.N) (⊤_ C) ⟶
+      Limits.prod WithNNO.N WithNNO.N):= by
+        apply Limits.prod.hom_ext
+        · rw[Limits.prod.lift_fst]
+        · rw[Limits.prod.lift_snd, Limits.prod.lift_fst]
+      rw[this]
+    · rw[← Category.assoc, aux1_NNO_sum_assoc, Category.assoc,
+      ← Category.assoc (prod.map (𝟙 WithNNO.N) (prod.map (𝟙 WithNNO.N) (NNO C).s)),
+      Limits.prod.map_map, NNO_sum, Rec_Par_with_NNO_fac_succ,
+      ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+      (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))), Limits.prod.lift_snd]
+      conv_rhs => rw[← Category.assoc, Limits.prod.lift_snd]
+      rw[Category.assoc, ← Limits.prod.map_map, Category.assoc, Rec_Par_with_NNO_fac_succ,
+      ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+      (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))), Limits.prod.lift_snd]
+      simp only [Category.assoc]
+
+--Main result
+
+theorem NNO_sum_assoc {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
+    Limits.prod.map NNO_sum (𝟙 (WithNNO.N (C := C)) ) ≫ NNO_sum =
+    (Limits.prod.associator WithNNO.N WithNNO.N WithNNO.N).hom ≫
+    Limits.prod.map (𝟙 WithNNO.N) NNO_sum ≫ NNO_sum := by
+    exact NNO_sum_assoc_part1.trans NNO_sum_assoc_part2.symm
+
+--Proof that the sum is commutative
+
+/- For the zero part of the main theorem, proof that the first function
+satisfies the recursion property
+-/
+
+theorem NNO_sum_comm_fac_zero1 {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
+    prod.map (NNO C).zero (𝟙 WithNNO.N) ≫ NNO_sum =
+    Rec_Par_with_NNO (NNO C).zero (Limits.prod.snd ≫ (NNO C).s) := by
+    apply Rec_Par_with_NNO_unique
+    · rw[← Category.assoc, Limits.prod.map_map, Category.comp_id, Category.id_comp]
+      have : prod.map (NNO C).zero (NNO C).zero =
+      Limits.prod.map (NNO C).zero (𝟙 (⊤_ C)) ≫ Limits.prod.map (𝟙 WithNNO.N) (NNO C).zero := by
+        simp only [Limits.prod.map_map, Category.comp_id, Category.id_comp]
+      rw[this, Category.assoc, NNO_sum, Rec_Par_with_NNO_fac_zero,
+      Category.comp_id, Limits.prod.map_fst]
+    · rw[← Category.assoc, Limits.prod.map_map, Category.comp_id, Category.id_comp,
+      ← Category.comp_id (NNO C).zero, ← Category.id_comp (NNO C).s, ← Limits.prod.map_map,
+      Category.assoc, NNO_sum, Rec_Par_with_NNO_fac_succ,
+      ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+      (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))),
+      Limits.prod.lift_snd, Category.comp_id, Category.id_comp,
+      ← Category.assoc (prod.lift (𝟙 ((⊤_ C) ⨯ WithNNO.N)) (prod.map (NNO C).zero (𝟙 WithNNO.N) ≫
+      Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))),
+      Limits.prod.lift_snd, Category.assoc]
+
+/- For the zero part of the main theorem, proof that the second function
+satisfies the recursion property
+-/
+
+theorem NNO_sum_comm_fac_zero2 {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
+    (Limits.prod.braiding (WithNNO.N) (⊤_ C)).inv
+    ≫ prod.fst = Rec_Par_with_NNO (NNO C).zero (Limits.prod.snd ≫ (NNO C).s) := by
+    rw[Limits.prod.braiding_inv, Limits.prod.lift_fst]
+    apply Rec_Par_with_NNO_unique
+    · rw[Limits.prod.map_snd,
+      Limits.terminal.hom_ext (Limits.prod.snd) (Limits.prod.fst)]
+    · rw[← Category.assoc, Limits.prod.map_snd, Limits.prod.lift_snd]
+
+/- For the succ part of the main theorem, proof that the first function
+satisfies the recursion property
+-/
+
+theorem NNO_sum_comm_fac_succ1 {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
+    prod.map (NNO C).s (𝟙 WithNNO.N) ≫ NNO_sum =
+    Rec_Par_with_NNO (NNO C).s (Limits.prod.snd ≫ (NNO C).s) := by
+      apply Rec_Par_with_NNO_unique
+      · rw[← Category.assoc, Limits.prod.map_map, Category.comp_id, Category.id_comp,
+        ← Category.comp_id (NNO C).s, ← Category.id_comp (NNO C).zero,
+        ← Limits.prod.map_map, Category.assoc, NNO_sum, Rec_Par_with_NNO_fac_zero,
+        Category.comp_id, Limits.prod.map_fst, Category.comp_id]
+      · conv_lhs => rw[← Category.assoc, Limits.prod.map_map, Category.comp_id, Category.id_comp]
+        have : prod.map (NNO C).s (NNO C).s =
+        prod.map (NNO C).s (𝟙 WithNNO.N) ≫ prod.map (𝟙 WithNNO.N) (NNO C).s := by
+          simp only [Limits.prod.map_map, Category.comp_id, Category.id_comp]
+        rw[this, Category.assoc, NNO_sum, Rec_Par_with_NNO_fac_succ,
+        ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+        (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))),
+        Limits.prod.lift_snd,
+        ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+        (prod.map (NNO C).s (𝟙 WithNNO.N) ≫ Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))),
+        Limits.prod.lift_snd]
+        simp only [Category.assoc]
+
+/- For the succ part of the main theorem, proof that the second function
+satisfies the recursion property
+-/
+
+theorem NNO_sum_comm_fac_succ2 {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] : NNO_sum ≫ (NNO C).s =
+    Rec_Par_with_NNO (NNO C).s (Limits.prod.snd ≫ (NNO C).s) := by
+    apply Rec_Par_with_NNO_unique
+    · rw[← Category.assoc, NNO_sum, Rec_Par_with_NNO_fac_zero, Category.comp_id]
+    · rw[← Category.assoc, NNO_sum, Rec_Par_with_NNO_fac_succ,
+      ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+      (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s))), Limits.prod.lift_snd,
+      ← Category.assoc (prod.lift (𝟙 (WithNNO.N ⨯ WithNNO.N))
+      (Rec_Par_with_NNO (𝟙 WithNNO.N) (prod.snd ≫ (NNO C).s) ≫ (NNO C).s)), Limits.prod.lift_snd]
+
+--Main result
+
+theorem NNO_sum_comm {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] :
+    (Limits.prod.braiding (WithNNO.N) (WithNNO.N)).hom ≫ NNO_sum (C := C) = NNO_sum := by
+    conv_rhs => rw[NNO_sum]
+    apply Rec_Par_with_NNO_unique
+    · rw[← Category.assoc, Limits.braid_natural, Category.comp_id,
+      ← Category.id_comp (prod.fst), ← (Limits.prod.braiding WithNNO.N (⊤_ C)).hom_inv_id,
+      Category.assoc, Category.assoc]
+      have : prod.map (NNO C).zero (𝟙 WithNNO.N) ≫ NNO_sum =
+      (Limits.prod.braiding (WithNNO.N) (⊤_ C)).inv ≫ prod.fst := by
+        exact NNO_sum_comm_fac_zero1.trans NNO_sum_comm_fac_zero2.symm
+      rw[this]
+    · rw[← Category.assoc, Limits.braid_natural, ← Category.assoc, Limits.prod.lift_snd,
+      Category.assoc, Category.assoc]
+      have : prod.map (NNO C).s (𝟙 WithNNO.N) ≫ NNO_sum = NNO_sum ≫ (NNO C).s := by
+        exact NNO_sum_comm_fac_succ1.trans NNO_sum_comm_fac_succ2.symm
+      rw[this]
+
 --------------------------------------------------------------------------------------------
 
---Section 9: Peano's third axiom
+--Section 10: Peano's third axiom
 
 --Definition of the left inverse of s (namely, the function precedent)
 
@@ -779,9 +1090,22 @@ instance {C : Type u} [Category C]
         exact hyp2
     }
 
+/-Addition: proof that, in a Cartesian closed category, if Peano's fourth axiom fails
+then there is at most one morphism between any two objects of the category
+-/
+
+theorem not_fourth_axiom_uniq_mor {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {x : ⊤_ C ⟶ WithNNO.N}
+    (h1 : x ≫ (NNO C).s = (NNO C).zero) {A B : C}
+    (f : A ⟶ B) (g : A ⟶ B) : f = g := by
+    have Nterm : IsTerminal (WithNNO.N) :=
+    IsTerminal.ofIso (terminalIsTerminal) (not_fourth_axiom_Nterm h1).symm
+    sorry
+
+
 ------------------------------------------------------------------------------------------------
 
---Section 10: Proof that Finset does not have an NNO
+--Section 11: Proof that Finset does not have an NNO
 
 --Proof that Fin 2 (= {0,1}) has an isomorphic equivalent in Finset
 
@@ -884,7 +1208,7 @@ lemma Finset_without_NNO : ¬ Nonempty (WithNNO (IsFinsetType α).FullSubcategor
 
 -----------------------------------------------------------------------------------------
 
---Section 11: NNO as initial algebra
+--Section 12: NNO as initial algebra
 
 --Definition of the functor T on which the algebra is built
 
