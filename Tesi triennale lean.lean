@@ -697,6 +697,16 @@ theorem expon_univ_prop {C : Type u} [Category C] [HasTerminal C]
     rw [h2] at h1
     exact h1
 
+--Proof of the identity between the structures MonoidalCategory.whisker and Limits.prod.map
+
+lemma whiskerLeft_eq_prod_map {C : Type u} [Category C] [HasTerminal C]
+    [HasBinaryProducts C] {A X Y : C} (f : X ⟶ Y) :
+    MonoidalCategoryStruct.whiskerLeft A f = Limits.prod.map (𝟙 A) f := by
+    apply Limits.prod.hom_ext
+    · exact ((CartesianMonoidalCategory.whiskerLeft_fst _ _).trans
+      ((Limits.prod.map_fst _ _).trans (Category.comp_id _)).symm)
+    · exact (CartesianMonoidalCategory.whiskerLeft_snd _ _).trans (Limits.prod.map_snd _ _).symm
+
 --Proof of the commutativity of the left side of the diagram
 
 theorem Rec_Par_with_NNO_fac_zero {C : Type u} [Category C] [HasTerminal C]
@@ -815,7 +825,29 @@ theorem Rec_Par_with_NNO_fac_succ {C : Type u} [Category C] [HasTerminal C]
     erw [aux3_Rec_Par_fac_succ]
     rfl
 
+--Technical results used in the uniqueness proof
+
 theorem aux1_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (h : Limits.prod A WithNNO.N ⟶ B)
+    (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f) :
+    (NNO C).zero ≫ MonoidalClosed.curry h =
+      MonoidalClosed.curry ((Limits.prod.rightUnitor A).hom ≫ f) := by
+        apply MonoidalClosed.uncurry_injective
+        rw [MonoidalClosed.uncurry_natural_left, MonoidalClosed.uncurry_curry,
+        MonoidalClosed.uncurry_curry]
+        have h1 : MonoidalCategoryStruct.whiskerLeft A (NNO C).zero =
+        Limits.prod.map (𝟙 A) (NNO C).zero := by
+          apply Limits.prod.hom_ext
+          · exact ((CartesianMonoidalCategory.whiskerLeft_fst _ _).trans
+            ((Limits.prod.map_fst _ _).trans (Category.comp_id _)).symm)
+          · exact ((CartesianMonoidalCategory.whiskerLeft_snd _ _).trans
+            (Limits.prod.map_snd _ _).symm)
+        erw [h1, hyp_zero]
+        rw [Limits.prod.rightUnitor_hom]
+        rfl
+
+theorem aux2_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
     [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
     (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
@@ -826,15 +858,49 @@ theorem aux1_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
     apply Rec_Par_with_NNO_Aterm_unique
     · rw[Limits.prod.leftUnitor_hom, ← Category.assoc, Limits.prod.map_snd,
       aux_function1_Rec_Par, Limits.terminal.hom_ext (prod.fst) (prod.snd),
-      Category.assoc]
-      have : (NNO C).zero ≫ MonoidalClosed.curry h =
-      MonoidalClosed.curry ((Limits.prod.rightUnitor A).hom ≫ f) := by
-        apply (MonoidalClosed.eq_curry_iff ((NNO C).zero ≫ MonoidalClosed.curry h)
-        ((Limits.prod.rightUnitor A).hom ≫ f)).mp
-      sorry
+      Category.assoc, aux1_Rec_Par_unique f h hyp_zero]
+    · rw[Limits.prod.leftUnitor_hom, ← Category.assoc, Limits.prod.map_snd,
+      aux_function3_Rec_Par, Limits.prod.associator_hom, Limits.prod.leftUnitor_hom,
+      ← Category.assoc (prod.lift (prod.fst ≫ prod.fst) (prod.lift (prod.fst ≫ prod.snd) prod.snd)),
+      Limits.prod.lift_snd, ← Category.assoc, Limits.prod.comp_lift,
+      ← Category.assoc (prod.lift (𝟙 ((⊤_ C) ⨯ WithNNO.N)) (prod.snd ≫ MonoidalClosed.curry h)),
+      Limits.prod.lift_fst, Limits.prod.lift_snd, Category.id_comp]
+      apply MonoidalClosed.uncurry_injective
+      rw [Category.assoc, MonoidalClosed.uncurry_natural_left,
+      MonoidalClosed.uncurry_natural_left, MonoidalClosed.uncurry_curry,
+      MonoidalClosed.uncurry_natural_left, MonoidalClosed.uncurry_curry,
+      whiskerLeft_eq_prod_map, whiskerLeft_eq_prod_map, whiskerLeft_eq_prod_map]
+      erw [hyp_succ, aux_function2_Rec_Par, ← Category.assoc, ← Category.assoc]
+      congr 1
+      apply Limits.prod.hom_ext
+      · erw [Category.assoc, Limits.prod.lift_fst, Category.comp_id, Category.assoc,
+        Limits.prod.lift_fst, Limits.prod.associator_inv, ← Category.assoc,
+        Limits.prod.comp_lift, Limits.prod.lift_fst]
+        apply Limits.prod.hom_ext
+        · erw [Limits.prod.map_fst, Category.assoc, Limits.prod.lift_fst, Limits.prod.map_fst]
+        · erw [Limits.prod.map_snd, Category.assoc, Limits.prod.lift_snd, ← Category.assoc,
+          Limits.prod.map_snd, Category.assoc, Limits.prod.lift_fst]
+      · erw [Category.assoc, Limits.prod.lift_snd, Category.assoc, Limits.prod.lift_snd,
+         ← Category.assoc, Limits.prod.comp_lift, Limits.prod.map_fst,
+         ← Category.assoc (prod.map (𝟙 A)
+         (prod.lift prod.snd (prod.snd ≫ MonoidalClosed.curry h))), Limits.prod.map_snd,
+         Category.comp_id, ← Category.assoc, Category.assoc (prod.snd), Limits.prod.lift_snd]
+        have : (Limits.prod.lift (Limits.prod.fst :
+        Limits.prod A (Limits.prod (⊤_ C) WithNNO.N) ⟶ A)
+        (Limits.prod.snd ≫ Limits.prod.snd ≫ MonoidalClosed.curry h) =
+        Limits.prod.map (𝟙 A) Limits.prod.snd ≫
+        Limits.prod.map (𝟙 A) (MonoidalClosed.curry h)) := by
+          rw [Limits.prod.map_map, Category.id_comp]
+          apply Limits.prod.hom_ext
+          · rw [Limits.prod.lift_fst, Limits.prod.map_fst, Category.comp_id]
+          · rw [Limits.prod.lift_snd, Limits.prod.map_snd]
+        rw[CategoryTheory.ihom.ihom_adjunction_unit, Category.assoc (prod.snd)]
+        erw[← MonoidalClosed.curry_eq, this, Category.assoc, expon_univ_prop h]
+        rfl
 
+--Proof that h is the exponential transpose of the aux_function4
 
-theorem aux2_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
+theorem h_eq_expon_transp {C : Type u} [Category C] [HasTerminal C]
     [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
     (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
@@ -843,15 +909,29 @@ theorem aux2_Rec_Par_unique {C : Type u} [Category C] [HasTerminal C]
     MonoidalClosed.curry h = (aux_function4_Rec_Par f g) := by
     rw[aux_function4_Rec_Par, ← Category.id_comp (MonoidalClosed.curry h),
     ← (Limits.prod.leftUnitor (WithNNO.N)).inv_hom_id, Category.assoc,
-    ]
+    aux2_Rec_Par_unique f g h hyp_zero hyp_succ]
+
+--Proof that Rec_Par_with_NNO is the exponential transpose of aux_function4
+
+theorem Rec_Par_eq_expon_transp {C : Type u} [Category C] [HasTerminal C]
+    [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
+    (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) :
+    MonoidalClosed.curry (Rec_Par_with_NNO f g) = (aux_function4_Rec_Par f g) := by
+    apply MonoidalClosed.uncurry_injective
+    rw[MonoidalClosed.uncurry_curry, Rec_Par_with_NNO, MonoidalClosed.uncurry_eq,
+    whiskerLeft_eq_prod_map]
+    rfl
+
+--Main result
 
 theorem Rec_Par_with_NNO_unique {C : Type u} [Category C] [HasTerminal C]
     [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {A B : C} (f : A ⟶ B)
     (g : Limits.prod (Limits.prod A WithNNO.N) B ⟶ B) (h : Limits.prod A WithNNO.N ⟶ B)
     (hyp_zero : Limits.prod.map (𝟙 A) (NNO C).zero ≫ h = Limits.prod.fst ≫ f)
     (hyp_succ : Limits.prod.map (𝟙 A) (NNO C).s ≫ h =
-    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = Rec_Par_with_NNO f g := by sorry
-
+    Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = Rec_Par_with_NNO f g := by
+    apply MonoidalClosed.curry_injective
+    exact (h_eq_expon_transp f g h hyp_zero hyp_succ).trans (Rec_Par_eq_expon_transp f g).symm
 ------------------------------------------------------------------------------------------------
 
 --Section 9: Definition and properties of the sum
@@ -1098,9 +1178,10 @@ theorem not_fourth_axiom_uniq_mor {C : Type u} [Category C] [HasTerminal C]
     [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {x : ⊤_ C ⟶ WithNNO.N}
     (h1 : x ≫ (NNO C).s = (NNO C).zero) {A B : C}
     (f : A ⟶ B) (g : A ⟶ B) : f = g := by
-    have Nterm : IsTerminal (WithNNO.N) :=
-    IsTerminal.ofIso (terminalIsTerminal) (not_fourth_axiom_Nterm h1).symm
+    have T_NNO : IsNNO (⊤_ C) :=
+    IsNNO.ofIso (WithNNO.isNNO) (not_fourth_axiom_Nterm h1)
     sorry
+
 
 
 ------------------------------------------------------------------------------------------------
