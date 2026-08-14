@@ -1179,7 +1179,12 @@ theorem not_fourth_axiom_uniq_mor {C : Type u} [Category C] [HasTerminal C]
     (h1 : x ≫ (NNO C).s = (NNO C).zero) {A B : C}
     (f : A ⟶ B) (g : A ⟶ B) : f = g := by
     have T_NNO : IsNNO (⊤_ C) :=
-    IsNNO.ofIso (WithNNO.isNNO) (not_fourth_axiom_Nterm h1)
+      IsNNO.ofIso (WithNNO.isNNO) (not_fourth_axiom_Nterm h1)
+    let inst : WithNNO C :=
+    { N := ⊤_ C
+      isNNO := T_NNO }
+    let g' : ((A ⨯ WithNNO.N) ⨯ B ⟶ B) := sorry
+    have := @Rec_Par_with_NNO C _ _ inst _ _ A B f g'
     sorry
 
 
