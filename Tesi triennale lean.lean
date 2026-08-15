@@ -1,20 +1,10 @@
---import «Tesi triennale lean».Basic
-import Mathlib.CategoryTheory.Category.Basic
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Finset.Prod
-import Mathlib.CategoryTheory.Limits.Shapes.BinaryProducts
-import Mathlib.CategoryTheory.Limits.Shapes.Terminal
-import Mathlib.Data.Nat.Pairing
-import Mathlib.CategoryTheory.Widesubcategory
-import Mathlib.CategoryTheory.Types.Basic
-import Mathlib.CategoryTheory.ConcreteCategory.Basic
-import Mathlib.CategoryTheory.Limits.Types.Limits
-import Mathlib.CategoryTheory.ObjectProperty.LimitsOfShape
-import Mathlib.SetTheory.Cardinal.Arithmetic
-import Mathlib.CategoryTheory.Monoidal.Closed.Cartesian
+import Mathlib.Algebra.Order.Interval.Set.Instances
 import Mathlib.CategoryTheory.Endofunctor.Algebra
-import Mathlib.CategoryTheory.ObjectProperty.FullSubcategory
 import Mathlib.CategoryTheory.Monoidal.Cartesian.Basic
+import Mathlib.CategoryTheory.Monoidal.Closed.Basic
+import Mathlib.Data.Real.Basic
+import Mathlib.SetTheory.Cardinal.Arithmetic
+import Mathlib.Tactic.NormNum.Ineq
 open CategoryTheory Limits WalkingPair ObjectProperty
 
 set_option autoImplicit false
@@ -24,6 +14,7 @@ set_option autoImplicit false
 Main definitions
 
 WithNNO
+Nat_NNO_Type
 WithMyNNO
 Rec_Par_with_NNO
 NNO_sum
@@ -31,6 +22,9 @@ NNO_product
 
 Main results
 
+Finset_has_terminal
+Finset_has_binary_products
+IsNNO.ofIso
 NNO_unique_up_to_iso
 not_fourth_axiom_Nterm
 fourth_axiom
@@ -38,13 +32,15 @@ fifth_axiom
 Rec_Par_with_NNO_fac_zero
 Rec_Par_with_NNO_fac_succ
 Rec_Par_with_NNO_unique
+NNO_sum_assoc
+NNO_sum_comm
 Finset_without_NNO
 NNO_init_alg
 -/
 universe u
  ----------------------------------------------------------------------
 
---Section 1: Proof that Finset is Cartesian closed
+--Section 1: Proof that Finset has a terminal object and binary products
 
 variable (α : Type u) [Inhabited α] [Infinite α]
 
@@ -142,23 +138,25 @@ theorem Finset_has_binary_products : HasBinaryProducts (IsFinsetType α).FullSub
 
 structure IsNNO {C : Type u} [Category C]
 [HasTerminal C] (N : C) where
-
+--Definition of the zero morphism
 zero : ⊤_ C ⟶ N
-
+--Definition of the s morphism
 s : N ⟶ N
-
+--Definition of the morphism given by the universal property
 recursion {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : N ⟶  X
-
+--Proof that the left side of the diagram commutes
 fac_zero {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : zero ≫ recursion f g = f
-
+--Proof that the right side of the diagram commutes
 fac_succ {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) : s ≫ recursion f g = recursion f g ≫ g
-
+--Proof of the uniqueness of such morphism
 uniq {X : C} (f : ⊤_ C ⟶ X) (g : X ⟶ X) (h : N ⟶ X) (hyp_zero : zero ≫ h = f)
               (hyp_succ : s ≫ h = h ≫ g) : h = recursion f g
 
 class WithNNO (C : Type u) [Category C]
 [HasTerminal C] where
+--The NNO
 N : C
+--Proof that it is an NNO
 isNNO : IsNNO N
 
 abbrev NNO (C : Type u) [Category C] [HasTerminal C] [WithNNO C] : IsNNO (WithNNO.N (C := C)) :=
@@ -932,6 +930,7 @@ theorem Rec_Par_with_NNO_unique {C : Type u} [Category C] [HasTerminal C]
     Limits.prod.lift (𝟙 (Limits.prod A WithNNO.N)) h ≫ g) : h = Rec_Par_with_NNO f g := by
     apply MonoidalClosed.curry_injective
     exact (h_eq_expon_transp f g h hyp_zero hyp_succ).trans (Rec_Par_eq_expon_transp f g).symm
+
 ------------------------------------------------------------------------------------------------
 
 --Section 9: Definition and properties of the sum
@@ -1170,7 +1169,11 @@ instance {C : Type u} [Category C]
         exact hyp2
     }
 
-/-Addition: proof that, in a Cartesian closed category, if Peano's fourth axiom fails
+-------------------------------------------------------------------------------------------
+
+--Section 11: NNO in preorder categories
+
+/-Proof that, in a Cartesian closed category, if Peano's fourth axiom fails
 then there is at most one morphism between any two objects of the category
 -/
 
@@ -1178,14 +1181,24 @@ theorem not_fourth_axiom_uniq_mor {C : Type u} [Category C] [HasTerminal C]
     [WithNNO C] [HasBinaryProducts C] [MonoidalClosed C] {x : ⊤_ C ⟶ WithNNO.N}
     (h1 : x ≫ (NNO C).s = (NNO C).zero) {A B : C}
     (f : A ⟶ B) (g : A ⟶ B) : f = g := by
-    have T_NNO : IsNNO (⊤_ C) :=
-      IsNNO.ofIso (WithNNO.isNNO) (not_fourth_axiom_Nterm h1)
     let inst : WithNNO C :=
     { N := ⊤_ C
-      isNNO := T_NNO }
-    let g' : ((A ⨯ WithNNO.N) ⨯ B ⟶ B) := sorry
-    have := @Rec_Par_with_NNO C _ _ inst _ _ A B f g'
-    sorry
+      isNNO := IsNNO.ofIso (WithNNO.isNNO) (not_fourth_axiom_Nterm h1) }
+    let g' : ((A ⨯ WithNNO.N) ⨯ B ⟶ B) := prod.fst ≫ prod.fst ≫ g
+    have equal : inst.isNNO.zero = inst.isNNO.s :=
+    Limits.terminal.hom_ext (inst.isNNO.zero) (inst.isNNO.s)
+    have h1 := @Rec_Par_with_NNO_fac_zero C _ _ inst _ _ A B f g'
+    rw[equal] at h1
+    have h2 : prod.fst ≫ f = prod.lift (𝟙 (A ⨯ WithNNO.N)) (Rec_Par_with_NNO f g') ≫ g' := by
+      exact (h1.symm).trans (@Rec_Par_with_NNO_fac_succ C _ _ inst _ _ A B f g')
+    unfold g' at h2
+    rw[← Category.assoc, Limits.prod.lift_fst, Category.id_comp] at h2
+    have h2' : (prod.rightUnitor A).inv ≫ prod.fst ≫ f =
+    (prod.rightUnitor A).inv ≫ prod.fst ≫ g :=
+      congr_arg ((prod.rightUnitor A).inv ≫ ·) h2
+    rw[← Limits.prod.rightUnitor_hom, ← Category.assoc, ← Category.assoc,
+    (Limits.prod.rightUnitor A).inv_hom_id, Category.id_comp, Category.id_comp] at h2'
+    exact h2'
 
 
 
@@ -1377,3 +1390,134 @@ noncomputable def NNO_init_alg {C : Type u} [Category C] [HasTerminal C] [WithNN
             }
 
 ----------------------------------------------------------------------------------------------
+
+--Section 13: NNO as a coproduct diagram
+
+--Definition of the functor from the category 2 towards the two objects of the coproduct
+
+noncomputable def Coprod_functor {C : Type u} [Category C] [HasTerminal C] [WithNNO C] :
+      Functor (CategoryTheory.Discrete CategoryTheory.Limits.WalkingPair) C :=
+      Discrete.functor (fun x => match x with
+          | left => (⊤_ C)
+          | right => WithNNO.N)
+
+--Definition of the coproduct as a cocone
+
+noncomputable def Coprod_cocone {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] : Cocone Coprod_functor (C := C) :=
+      {
+        pt := WithNNO.N
+        ι := Discrete.natTrans (fun j => match j with
+          | ⟨Limits.WalkingPair.left⟩  => (NNO C).zero
+          | ⟨Limits.WalkingPair.right⟩ => (NNO C).s)
+      }
+
+--Technical results needed in the main one
+
+theorem Nalg_str_inl {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+    [HasBinaryCoproducts C] :
+    Limits.coprod.inl ≫ (Nalg (C := C)).str = (NNO C).zero := by
+      simp [Nalg, coprod.inl_desc]
+
+theorem Nalg_str_inr {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+    [HasBinaryCoproducts C] :
+    Limits.coprod.inr ≫ (Nalg (C := C)).str = (NNO C).s := by
+      simp [Nalg, coprod.inr_desc]
+
+--Proof that ⊤⊔N is isomorphic to N (application of Lambek's theorem)
+
+instance {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] : IsIso (Nalg.str (C := C)) :=
+        Endofunctor.Algebra.Initial.str_isIso NNO_init_alg
+
+--Proof that the previously defined cocone is a colimit (main result)
+
+noncomputable def NNO_is_coproduct {C : Type u} [Category C] [HasTerminal C] [WithNNO C]
+      [HasBinaryCoproducts C] : IsColimit (Coprod_cocone (C := C)) :=
+      { desc s :=
+          (asIso Nalg.str).inv ≫
+      Limits.coprod.desc (s.ι.app ⟨Limits.WalkingPair.left⟩) (s.ι.app ⟨Limits.WalkingPair.right⟩)
+        fac := by
+          rintro s ⟨j⟩
+          cases j with
+            | left =>
+              change (NNO C).zero ≫ (asIso Nalg.str).inv ≫
+              (Limits.coprod.desc (s.ι.app ⟨Limits.WalkingPair.left⟩)
+              (s.ι.app ⟨Limits.WalkingPair.right⟩))
+              = s.ι.app ⟨Limits.WalkingPair.left⟩
+              erw [← Nalg_str_inl, Category.assoc (coprod.inl),
+              IsIso.hom_inv_id_assoc (Nalg.str), Limits.coprod.inl_desc]
+            | right =>
+                change (NNO C).s ≫ (asIso Nalg.str).inv ≫
+                Limits.coprod.desc (s.ι.app ⟨Limits.WalkingPair.left⟩)
+                 (s.ι.app ⟨Limits.WalkingPair.right⟩)
+                   = s.ι.app ⟨Limits.WalkingPair.right⟩
+                erw [← Nalg_str_inr, Category.assoc,
+                IsIso.hom_inv_id_assoc (Nalg.str), Limits.coprod.inr_desc]
+
+        uniq := by
+          intro s m hm
+          have hl : (NNO C).zero ≫ m = s.ι.app ⟨Limits.WalkingPair.left⟩ :=
+          hm ⟨Limits.WalkingPair.left⟩
+          have hr : (NNO C).s ≫ m = s.ι.app ⟨Limits.WalkingPair.right⟩ :=
+          hm ⟨Limits.WalkingPair.right⟩
+          have hstr : Nalg.str ≫ m =
+            Limits.coprod.desc (s.ι.app ⟨Limits.WalkingPair.left⟩)
+            (s.ι.app ⟨Limits.WalkingPair.right⟩) := by
+            apply Limits.coprod.hom_ext
+            · erw [← Category.assoc, Nalg_str_inl, hl, Limits.coprod.inl_desc]
+            · erw [← Category.assoc, Nalg_str_inr, hr, Limits.coprod.inr_desc]
+          erw [← hstr, ← Category.assoc, IsIso.inv_hom_id (Nalg.str), Category.id_comp]
+      }
+
+---------------------------------------------------------------------------------------------
+
+--Section 14: The NNO of the preorder category associated to the interval [0,1]
+
+--Proof that 1 is the terminal object of the preorder category associated to [0,1]
+
+def one_term (F : Functor (Discrete PEmpty.{1}) (Set.Icc (0 : ℝ) 1)) :
+    LimitCone F where
+  cone :=
+    { pt := ⟨1, by norm_num⟩
+      π :=
+        { app := fun j => j.as.elim
+          naturality := by rintro ⟨j⟩ ⟨j'⟩ f; exact j.elim } }
+  isLimit :=
+    { lift s := homOfLE s.pt.2.2
+      fac := by rintro s ⟨j⟩; exact j.elim
+      uniq := by intro s m _; exact Subsingleton.elim m _ }
+
+--Proof that such category has a terminal object
+
+instance : HasTerminal (↑(Set.Icc (0 : ℝ) 1)) :=
+  {
+    has_limit F := {
+                      exists_limit := ⟨one_term F⟩
+                   }
+  }
+
+--Proof that this category has an NNO (namely 1)
+
+noncomputable instance : WithNNO (↑(Set.Icc (0 : ℝ) 1)) :=
+  letI : Category (↑(Set.Icc (0 : ℝ) 1)) := Preorder.smallCategory _
+  { N := 1
+    isNNO := {
+      zero := homOfLE (⊤_ (↑(Set.Icc (0:ℝ) 1))).2.2
+      s := 𝟙 1
+      recursion := fun {X} f g => by
+        have h1 : (⊤_ (↑(Set.Icc (0:ℝ) 1))).1 ≤ (1 : ↥(Set.Icc (0:ℝ) 1)).1 :=
+          (Set.mem_Icc.mp (⊤_ (↑(Set.Icc (0:ℝ) 1))).2).2
+        have h2 : (1 : ↥(Set.Icc (0:ℝ) 1)).1 ≤ (⊤_ (↑(Set.Icc (0:ℝ) 1))).1 :=
+          leOfHom (terminal.from (1 : ↥(Set.Icc (0:ℝ) 1)))
+        have htop : (⊤_ (↑(Set.Icc (0:ℝ) 1)) : ↥(Set.Icc (0:ℝ) 1)) = 1 :=
+          Subtype.ext (le_antisymm h1 h2)
+        have hf : (⊤_ (↑(Set.Icc (0:ℝ) 1))).1 ≤ X.1 := leOfHom f
+        rw [htop] at hf
+        have hX1 : X.1 = 1 := le_antisymm (Set.mem_Icc.mp X.2).2 hf
+        exact eqToHom (Subtype.ext hX1).symm
+      fac_zero f g := Subsingleton.elim _ _
+      fac_succ f g := Subsingleton.elim _ _
+      uniq f g h hyp_zero hyp_succ := Subsingleton.elim _ _
+    }
+  }
